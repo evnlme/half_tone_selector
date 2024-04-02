@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Service
+ServiceTypes=Krita/PythonPlugin
+X-KDE-Library=half_tone_selector
+X-Python-2-Compatible=false
+X-Krita-Manual=Manual.html
+Name=Half Tone Selector
+Comment=Generate half tones from light and dark tones.
