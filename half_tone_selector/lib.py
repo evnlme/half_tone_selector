@@ -1,4 +1,7 @@
+import json
 import math
+from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Callable, Optional, List, Tuple
 from krita import (
     Krita,
@@ -10,6 +13,45 @@ from krita import (
     QLayout,
     QWidget,
 )
+
+@dataclass
+class AppState:
+    light: QColor = field(default_factory=lambda: QColor(128, 128, 128))
+    dark: QColor = field(default_factory=lambda: QColor(64, 64, 64))
+    count: int = 5
+    cos: bool = True
+    exp: float = 0.45
+    halfTones: List[List[QColor]] = field(default_factory=list)
+
+    def to_dict(self) -> dict:
+        return {
+            'light': self.light.name(),
+            'dark': self.dark.name(),
+            'count': self.count,
+            'cos': self.cos,
+            'exp': self.exp,
+            'halfTones': [[tone.name() for tone in ht] for ht in self.halfTones]
+        }
+
+    def to_file(self, path: Path) -> None:
+        with path.open('w') as f:
+            json.dump(self.to_dict(), f)
+
+    @staticmethod
+    def from_dict(d: dict) -> 'AppState':
+        return AppState(
+            light=QColor(d['light']),
+            dark=QColor(d['dark']),
+            count=d['count'],
+            cos=d['cos'],
+            exp=d['exp'],
+            halfTones=[[QColor(tone) for tone in ht] for ht in d['halfTones']]
+        )
+
+    @staticmethod
+    def from_file(path: Path) -> 'AppState':
+        with path.open() as f:
+            return AppState.from_dict(json.load(f))
 
 def getActiveView() -> View:
     instance = Krita.instance()
@@ -37,16 +79,14 @@ def setFGColor(color: QColor) -> None:
 def getWindowColor() -> QColor:
     return QApplication.palette().color(QPalette.Window)
 
-def halfLight(state: dict) -> QColor:
-    rgba = state['light'].getRgb()
+def halfLight(state: AppState) -> QColor:
+    rgba = state.light.getRgb()
     halfRgb = [round(x / 2) for x in rgba[:3]]
     return QColor(*halfRgb, rgba[3])
 
-def computeIntervals(getN, getExp, getCos) -> List[float]:
-    n = getN()
-    exp = getExp()
+def computeIntervals(n: int, cos: bool, exp: float) -> List[float]:
     intervals = [i / (n+1) for i in range(n+2)]
-    if getCos():
+    if cos:
         intervals = [math.cos(x * math.pi / 2) for x in intervals]
     intervals = [round(x**exp, 2) for x in intervals]
     return intervals
