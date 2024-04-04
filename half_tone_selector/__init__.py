@@ -1,13 +1,3 @@
-"""
-
-References:
-https://scripting.krita.org/lessons/plugins-create
-https://github.com/kaichi1342/PaletteGenerator
-https://api.kde.org/krita/html/index.html
-https://doc.qt.io/qt-6/widget-classes.html
-https://www.riverbankcomputing.com/static/Docs/PyQt6/index.html
-"""
-
 import math
 from typing import Callable, Optional, List, Tuple
 from krita import (
@@ -19,7 +9,10 @@ from krita import (
     View,
 )
 from PyQt5.QtCore import Qt
-from PyQt5.QtGui import QColor
+from PyQt5.QtGui import (
+    QColor,
+    QPalette,
+)
 from PyQt5.QtWidgets import (
     QWidget,
     QLayout,
@@ -32,6 +25,8 @@ from PyQt5.QtWidgets import (
     QSpinBox,
     QDoubleSpinBox,
     QCheckBox,
+    QApplication,
+    QScrollArea,
 )
 
 def getActiveView() -> View:
@@ -57,6 +52,9 @@ def setFGColor(color: QColor) -> None:
     if view:
         view.setForeGroundColor(ManagedColor.fromQColor(color))
 
+def getWindowColor() -> QColor:
+    return QApplication.palette().color(QPalette.Window)
+
 def addLayout(
         qlayout: Callable[[], QLayout],
         qwidget: Callable[[], QWidget]=None,
@@ -69,26 +67,37 @@ def addLayout(
         layout.addWidget(child)
     return widget, layout
 
-def createSelectToneWidget(name, options, defaultTone, updateTone):
+def createSelectToneWidget(
+        name: str,
+        options: list,
+        defaultTone: QColor,
+        updateTone: Callable[[QColor], None],
+        style: dict,
+        ) -> QWidget:
     def setLabelStyle(widget):
         widget.setFixedWidth(80)
-        widget.setStyleSheet('''
-            QLabel {
+        widget.setStyleSheet(f'''
+            QLabel {{
                 border: 0px solid transparent;
                 border-radius: 0px;
                 padding: 5px 10px;
-                background-color: #404040;
-            }
+                background-color: {style['label'].name()};
+            }}
         ''')
 
     def setColor(widget, color):
         updateTone(color)
+        fontColor = scaleColor(color, 1, 96 if color.value() < 128 else -96)
         widget.setStyleSheet(f'''
             QPushButton {{
                 border: 0px solid transparent;
                 border-radius: 0px;
                 padding: 5px 10px;
                 background-color: {color.name()};
+                color: {fontColor.name()};
+            }}
+            QPushButton::hover {{
+                border: 1px solid {style['window'].name()};
             }}
         ''')
 
@@ -102,16 +111,16 @@ def createSelectToneWidget(name, options, defaultTone, updateTone):
             setColor(widget, color)
 
     def setOptionStyle(widget):
-        widget.setStyleSheet('''
-            QPushButton {
+        widget.setStyleSheet(f'''
+            QPushButton {{
                 border: 0px solid transparent;
                 border-radius: 0px;
                 padding: 5px 10px;
-                background-color: #606060;
-            }
-            QPushButton::hover {
-                background-color: #505050;
-            }
+                background-color: {style['button'].name()};
+            }}
+            QPushButton::hover {{
+                background-color: {style['window'].name()};
+            }}
         ''')
 
     def handleOptionClick(widget, getColor):
@@ -144,14 +153,18 @@ def createSelectToneWidget(name, options, defaultTone, updateTone):
 
     return widget
 
-def createColorBarWidget(colors: List[QColor]) -> QWidget:
+def createColorBarWidget(colors: List[QColor], style: dict) -> QWidget:
     def createColorPatch(color):
         patch = QPushButton()
+        patch.setMinimumSize(16, 16)
         patch.setStyleSheet(f'''
             QPushButton {{
                 border: 0px solid transparent;
                 border-radius: 0px;
                 background-color: {color.name()};
+            }}
+            QPushButton::hover {{
+                border: 0.5px solid {style['window'].name()};
             }}
         ''')
         patch.clicked.connect(lambda: setFGColor(color))
@@ -165,18 +178,17 @@ def createColorBarWidget(colors: List[QColor]) -> QWidget:
         patch = createColorPatch(color)
         layout.addWidget(patch)
 
-    deleteButton = QPushButton('Delete')
+    deleteButton = QPushButton()
+    deleteButton.setIcon(Krita.instance().icon('deletelayer'))
     deleteButton.clicked.connect(lambda: widget.deleteLater())
     layout.addWidget(deleteButton)
 
     return widget
 
 def halfLight(state: dict) -> QColor:
-    r, g, b, a = state['light'].getRgb()
-    r2 = round(r / 2)
-    g2 = round(g / 2)
-    b2 = round(b / 2)
-    return QColor(r2, g2, b2, a)
+    rgba = state['light'].getRgb()
+    halfRgb = [round(x / 2) for x in rgba[:3]]
+    return QColor(*halfRgb, rgba[3])
 
 def computeIntervals(getN, getExp, getCos) -> List[float]:
     n = getN()
@@ -194,10 +206,26 @@ def interpolateColors(c1: QColor, c2: QColor, t: float) -> QColor:
     rgba = [round(x1*t + x2*(1-t)) for x1, x2 in zip(rgba1, rgba2)]
     return QColor(*rgba)
 
+def clamp(xmin: float, xmax: float, x: float) -> float:
+    return max(min(x, xmax), xmin)
+
+def scaleColor(color: QColor, scale: float, b: int = 0) -> QColor:
+    rgb = color.getRgb()[:3]
+    scaledRgb = [round(clamp(0, 255, x*scale + b)) for x in rgb]
+    return QColor(*scaledRgb)
+
 def createHalfToneSelectorWidget() -> QWidget:
     state = {
         'light': QColor(128, 128, 128),
         'dark': QColor(64, 64, 64),
+    }
+    windowColor = getWindowColor()
+    isDark = windowColor.value() < 128
+    style = {
+        'window': windowColor,
+        'background': scaleColor(windowColor, 1, 8 if isDark else -8),
+        'label': scaleColor(windowColor, 1, 16 if isDark else -16),
+        'button': scaleColor(windowColor, 1, 32 if isDark else -32),
     }
 
     # Select light tone
@@ -210,6 +238,7 @@ def createHalfToneSelectorWidget() -> QWidget:
         ],
         state['light'],
         lambda tone: state.update(light=tone),
+        style,
     )
 
     # Select dark tone
@@ -223,6 +252,7 @@ def createHalfToneSelectorWidget() -> QWidget:
         ],
         state['dark'],
         lambda tone: state.update(dark=tone),
+        style,
     )
 
     # Select half tone count - Positive integer
@@ -262,7 +292,7 @@ def createHalfToneSelectorWidget() -> QWidget:
             getExp=doubleSpinBox.value,
             getCos=cosineCheckBox.isChecked)
         colors = [interpolateColors(state['light'], state['dark'], i) for i in intervals]
-        layout.addWidget(createColorBarWidget(colors))
+        layout.addWidget(createColorBarWidget(colors, style))
 
     createButton = QPushButton('Create half tones')
     createButton.clicked.connect(create)
@@ -276,18 +306,22 @@ def createHalfToneSelectorWidget() -> QWidget:
         ])
     layout.setSpacing(5)
     layout.setAlignment(Qt.AlignTop)
+    widget.setStyleSheet(f'''
+        QWidget {{
+            background-color: {style['background'].name()};
+        }}
+    ''')
 
-    wrapperWidget, _ = addLayout(
-        qlayout=QVBoxLayout,
-        childWidgets=[widget])
-
-    return wrapperWidget
+    scrollArea = QScrollArea()
+    scrollArea.setWidgetResizable(True)
+    scrollArea.setWidget(widget)
+    return scrollArea
 
 class HalfToneSelector(DockWidget):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle('Half Tone Selector')
         widget = createHalfToneSelectorWidget()
+        self.setWindowTitle('Half Tone Selector')
         self.setWidget(widget)
 
     # notifies when views are added or removed
