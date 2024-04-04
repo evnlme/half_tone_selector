@@ -8,6 +8,7 @@ local_paths = [
     f'{name}.desktop',
     f'{name}/',
     f'{name}/__init__.py',
+    f'{name}/lib.py',
     f'{name}/Manual.html',
 ]
 
