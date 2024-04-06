@@ -7,6 +7,7 @@ from krita import (
     Krita,
     Qt,
     QColor,
+    QFontMetrics,
     QWidget,
     QLayout,
     QHBoxLayout,
@@ -14,6 +15,7 @@ from krita import (
     QPushButton,
     QSizePolicy,
     QLabel,
+    QLineEdit,
     QColorDialog,
     QSpinBox,
     QDoubleSpinBox,
@@ -126,35 +128,77 @@ def createSelectToneWidget(
 
     return widget
 
+def createColorPatch(color: QColor, style: dict) -> QWidget:
+    patch = QPushButton()
+    patch.setMinimumSize(18, 18)
+    patch.setToolTip(str(color.getRgb()[:3]))
+    patch.setStyleSheet(f'''
+        QPushButton {{
+            border: 0px solid transparent;
+            border-radius: 0px;
+            background-color: {color.name()};
+        }}
+        QPushButton::hover {{
+            border: 0.5px solid {style['background'].name()};
+        }}
+    ''')
+    patch.clicked.connect(lambda: setFGColor(color))
+    return patch
+
+def createColorPatchRow(colors: List[QColor], style: dict) -> QWidget:
+    patches = [createColorPatch(color, style) for color in colors]
+    widget, layout = addLayout(qlayout=QHBoxLayout, childWidgets=patches)
+    widget.setStyleSheet(f'''
+        QWidget {{
+            border: 0px solid transparent;
+            border-radius: 0px;
+            background-color: {style['background'].name()};
+        }}
+    ''')
+    layout.setContentsMargins(1, 1, 1, 1)
+    layout.setSpacing(1)
+    return widget
+
 def createColorBarWidget(
         colors: List[QColor],
         style: dict,
         parentLayout: QLayout,
         ) -> QWidget:
-    def createColorPatch(color):
-        patch = QPushButton()
-        patch.setMinimumSize(16, 16)
-        patch.setToolTip(str(color.getRgb()[:3]))
-        patch.setStyleSheet(f'''
-            QPushButton {{
-                border: 0px solid transparent;
-                border-radius: 0px;
-                background-color: {color.name()};
-            }}
-            QPushButton::hover {{
-                border: 0.5px solid {style['window'].name()};
-            }}
-        ''')
-        patch.clicked.connect(lambda: setFGColor(color))
-        return patch
+    colorPatchRow = createColorPatchRow(colors, style)
 
-    widget, layout = addLayout(QHBoxLayout)
+    line = QLineEdit(colors[0].name())
+    font = line.font()
+    font.setPointSize(8)
+    line.setFont(font)
+    fm = QFontMetrics(line.font())
+    line.setFixedHeight(fm.height())
+    line.setStyleSheet(f'''
+        QLineEdit {{
+            font-size: 8pt;
+            padding: 0px;
+            margin: 0px;
+            border: 0px solid transparent;
+        }}
+        QLineEdit::Hover {{
+            background-color: {style['background'].name()};
+        }}
+    ''')
+
+    widgetV, layoutV = addLayout(
+        qlayout=QVBoxLayout,
+        childWidgets=[colorPatchRow, line])
+    widgetV.setStyleSheet(f'''
+        QWidget {{
+            background-color: {style['label'].name()};
+        }}
+    ''')
+    layoutV.setContentsMargins(5, 2, 5, 2)
+    layoutV.setSpacing(1)
+
+    widget, layout = addLayout(qlayout=QHBoxLayout, childWidgets=[widgetV])
+    layout.setAlignment(Qt.AlignTop)
     layout.setContentsMargins(0, 0, 0, 0)
     layout.setSpacing(1)
-
-    for color in colors:
-        patch = createColorPatch(color)
-        layout.addWidget(patch)
 
     def delete():
         i = parentLayout.indexOf(widget)

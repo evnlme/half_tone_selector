@@ -1,8 +1,6 @@
 # Half Tone Selector
 
-Generate half tones from light and dark tones depending on the angle of incidence.
-
-By default, it will compute 5 tones at angles 15, 30, 45, 60, and 75 degrees.
+This plugin generates half tones from user defined light and dark tones. It is useful for shading and practice. If you know the angle between the light rays and what you are drawing, you will know which tone to use. By default, 5 half tones are generated at 15, 30, 45, 60, and 75 degrees. The light and dark tones correspond to 0 and 90 degrees.
 
 ![Default](./selection.png)
 
