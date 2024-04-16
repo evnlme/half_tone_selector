@@ -1,60 +1,30 @@
+import krita as K # type: ignore
 from typing import Callable, Optional, List, Tuple
 from .lib import (
     Float3,
 )
 from .state import (
-    AppState,
     HalfToneSet,
     generateColors,
-    halfLight,
 )
+from .app import HalfToneSelectorApp
 from .ki import (
     getFGColor,
     getBGColor,
     setFGColor,
     openFGColorDialog,
-    getWindowColor,
     scaleColor,
     oklchToQColor,
     qcolorToOklch,
-    loadData,
-)
-from krita import ( # type: ignore
-    QLayout,
-    QHBoxLayout,
-    QWidget,
-    QLabel,
-    DockWidget,
-    DockWidgetFactory,
-    DockWidgetFactoryBase,
-    Krita,
-    Qt,
-    QColor,
-    QFontMetrics,
-    QWidget,
-    QGroupBox,
-    QLayout,
-    QHBoxLayout,
-    QVBoxLayout,
-    QPushButton,
-    QButtonGroup,
-    QSizePolicy,
-    QLabel,
-    QLineEdit,
-    QColorDialog,
-    QSpinBox,
-    QDoubleSpinBox,
-    QCheckBox,
-    QScrollArea,
-    QTabWidget,
+    qcolorToOklchFunc,
 )
 
 def addLayout(
-        qlayout: Callable[[], QLayout],
-        qwidget: Optional[Callable[[], QWidget]]=None,
-        childWidgets: List[QWidget]=[],
-        ) -> Tuple[QWidget, QLayout]:
-    widget = QWidget() if qwidget is None else qwidget()
+        qlayout: Callable[[], K.QLayout],
+        qwidget: Optional[Callable[[], K.QWidget]]=None,
+        childWidgets: List[K.QWidget]=[],
+        ) -> Tuple[K.QWidget, K.QLayout]:
+    widget = K.QWidget() if qwidget is None else qwidget()
     layout = qlayout()
     widget.setLayout(layout)
     for child in childWidgets:
@@ -63,126 +33,145 @@ def addLayout(
 
 def labeledInput(
         name: str,
-        qwidget: Callable[[], QWidget],
-        ) -> Tuple[QWidget, QWidget, QLayout]:
-    label = QLabel(f'{name}:')
+        qwidget: Callable[[], K.QWidget],
+        ) -> Tuple[K.QWidget, K.QWidget, K.QLayout]:
+    label = K.QLabel(f'{name}:')
     input = qwidget()
     widget, layout = addLayout(
-        qlayout=QHBoxLayout,
+        qlayout=K.QHBoxLayout,
         childWidgets=[label, input])
     layout.setContentsMargins(0, 0, 0, 0)
     return input, widget, layout
 
-def createMainLayout(childWidgets: List[QWidget], style: dict) -> QWidget:
-    widget, layout = addLayout(
-        qlayout=QVBoxLayout,
-        childWidgets=childWidgets)
-    layout.setSpacing(5)
-    layout.setAlignment(Qt.AlignTop)
-    widget.setStyleSheet(f'''
-        QWidget {{
-            background-color: {style['background'].name()};
+def toneSelectOption(app: HalfToneSelectorApp, field: str, opt: dict) -> K.QPushButton:
+    button = K.QPushButton(opt['name'])
+    button.setStyleSheet(f'''
+        QPushButton {{
+            border: 0px solid transparent;
+            border-radius: 0px;
+            padding: 5px 10px;
+            background-color: {app.style['button'].name()};
+        }}
+        QPushButton::hover {{
+            background-color: {app.style['window'].name()};
         }}
     ''')
 
-    scrollArea = QScrollArea()
-    scrollArea.setWidgetResizable(True)
-    scrollArea.setWidget(widget)
-    return scrollArea
-
-def createSelectToneWidget(
-        name: str,
-        options: list,
-        getTone: Callable[[], QColor],
-        setTone: Callable[[QColor], None],
-        style: dict,
-        ) -> QWidget:
-    def setLabelStyle(widget):
-        widget.setStyleSheet(f'''
-            QLabel {{
-                border: 0px solid transparent;
-                border-radius: 0px;
-                padding: 5px 10px;
-                background-color: {style['label'].name()};
-            }}
-        ''')
-
-    def setColor(widget, lch: Float3):
-        setTone(lch)
-        color = oklchToQColor(lch)
-        fontColor = scaleColor(color, 1, 96 if color.value() < 128 else -96)
-        widget.setStyleSheet(f'''
-            QPushButton {{
-                border: 0px solid transparent;
-                border-radius: 0px;
-                padding: 5px 10px;
-                background-color: {color.name()};
-                color: {fontColor.name()};
-            }}
-            QPushButton::hover {{
-                border: 1px solid {style['window'].name()};
-            }}
-        ''')
-
-    def setColorStyle(widget):
-        widget.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
-        setColor(widget, getTone())
-
-    def handleColorDialog(widget):
-        # color = QColorDialog.getColor(oklchToQColor(getTone()))
-        def handler(color: QColor):
-            if color and color.isValid():
-                lch = qcolorToOklch(color)
-                setColor(widget, lch)
-
-        openFGColorDialog(oklchToQColor(getTone()), handler)
-
-    def setOptionStyle(widget):
-        widget.setStyleSheet(f'''
-            QPushButton {{
-                border: 0px solid transparent;
-                border-radius: 0px;
-                padding: 5px 10px;
-                background-color: {style['button'].name()};
-            }}
-            QPushButton::hover {{
-                background-color: {style['window'].name()};
-            }}
-        ''')
-
-    def handleOptionClick(widget, getColor):
+    def handleClick(getColor):
         color = getColor()
+        if color:
+            app.setState(**{field: color})
+
+    button.clicked.connect(lambda: handleClick(opt['getColor']))
+    return button
+
+def toneSelectColorStyle(app: HalfToneSelectorApp, field: str):
+    lch = getattr(app.s, field)
+    color = oklchToQColor(lch)
+    fontColor = scaleColor(color, 1, 96 if color.value() < 128 else -96)
+    return f'''
+        QPushButton {{
+            border: 0px solid transparent;
+            border-radius: 0px;
+            padding: 5px 10px;
+            background-color: {color.name()};
+            color: {fontColor.name()};
+        }}
+        QPushButton::hover {{
+            border: 1px solid {app.style['window'].name()};
+        }}
+    '''
+
+def handleColorDialog(app: HalfToneSelectorApp, field: str) -> None:
+    def handler(color: K.QColor) -> None:
         if color and color.isValid():
             lch = qcolorToOklch(color)
-            setColor(widget, lch)
+            app.setState(**{field: lch})
+    lch = getattr(app.s, field)
+    openFGColorDialog(oklchToQColor(lch), handler)
 
-    def createOptionButton(widget, opt):
-        button = QPushButton(opt['name'])
-        setOptionStyle(button)
-        button.clicked.connect(lambda: handleOptionClick(widget, opt['getColor']))
-        return button
+def toneSelectColor(app: HalfToneSelectorApp, field: str) -> K.QPushButton:
+    button = K.QPushButton('Color')
+    button.setSizePolicy(K.QSizePolicy.Expanding, K.QSizePolicy.Fixed)
+    def updateColor():
+        button.setStyleSheet(toneSelectColorStyle(app, field))
+    updateColor()
+    button.clicked.connect(lambda: handleColorDialog(app, field))
+    app.registerCallback([field], updateColor)
+    return button
 
-    widget, layout = addLayout(QHBoxLayout)
+def toneSelectLabel(app: HalfToneSelectorApp, name: str) -> K.QLabel:
+    label = K.QLabel(name)
+    label.setStyleSheet(f'''
+        QLabel {{
+            border: 0px solid transparent;
+            border-radius: 0px;
+            padding: 5px 10px;
+            background-color: {app.style['label'].name()};
+        }}
+    ''')
+    return label
+
+def toneSelectWidget(
+        app: HalfToneSelectorApp,
+        field: str,
+        name: str,
+        opts: List[dict],
+        ) -> K.QWidget:
+    childWidgets = [
+        toneSelectLabel(app, name),
+        toneSelectColor(app, field),
+        *[toneSelectOption(app, field, opt) for opt in opts]
+    ]
+    widget, layout = addLayout(qlayout=K.QHBoxLayout, childWidgets=childWidgets)
     layout.setContentsMargins(0, 0, 0, 0)
     layout.setSpacing(1)
-
-    label = QLabel(name)
-    setLabelStyle(label)
-    layout.addWidget(label)
-
-    colorButton = QPushButton('Color')
-    setColorStyle(colorButton)
-    colorButton.clicked.connect(lambda: handleColorDialog(colorButton))
-    layout.addWidget(colorButton)
-
-    for opt in options:
-        button = createOptionButton(colorButton, opt)
-        layout.addWidget(button)
-
     return widget
 
-def createColorPatch(lch: Float3, style: dict) -> QWidget:
-    patch = QPushButton()
+def toneLightWidget(app: HalfToneSelectorApp) -> K.QWidget:
+    widget = toneSelectWidget(
+        app, 'light', 'Light',
+        [
+            {'name': 'FG', 'getColor': qcolorToOklchFunc(getFGColor)},
+            {'name': 'BG', 'getColor': qcolorToOklchFunc(getBGColor)},
+        ],
+    )
+    return widget
+
+def toneDarkWidget(app: HalfToneSelectorApp) -> K.QWidget:
+    widget = toneSelectWidget(
+        app, 'dark', 'Dark',
+        [
+            {'name': 'Half', 'getColor': app.halfLight},
+            {'name': 'FG', 'getColor': qcolorToOklchFunc(getFGColor)},
+            {'name': 'BG', 'getColor': qcolorToOklchFunc(getBGColor)},
+        ],
+    )
+    return widget
+
+def toneChromaWidget(app: HalfToneSelectorApp) -> K.QDoubleSpinBox:
+    input, widget, _  = labeledInput('Chroma', K.QDoubleSpinBox)
+    input.setRange(-1, 1)
+    input.setSingleStep(0.05)
+    input.setValue(app.s.k)
+    input.valueChanged.connect(lambda d: app.setState(k=d))
+    return widget
+
+def toneSettings(app: HalfToneSelectorApp) -> K.QWidget:
+    widget, layout = addLayout(
+        qlayout=K.QVBoxLayout,
+        qwidget=lambda: K.QGroupBox('Base Tones'),
+        childWidgets=[
+            toneLightWidget(app),
+            toneDarkWidget(app),
+            toneChromaWidget(app),
+        ])
+    layout.setContentsMargins(2, 2, 2, 2)
+    layout.setSpacing(5)
+    return widget
+
+def colorBarPatch(app: HalfToneSelectorApp, lch: Float3) -> K.QPushButton:
+    patch = K.QPushButton()
     patch.setMinimumSize(18, 18)
     patch.setToolTip(str(lch))
     color = oklchToQColor(lch)
@@ -193,40 +182,33 @@ def createColorPatch(lch: Float3, style: dict) -> QWidget:
             background-color: {color.name()};
         }}
         QPushButton::hover {{
-            border: 0.5px solid {style['background'].name()};
+            border: 0.5px solid {app.style['background'].name()};
         }}
     ''')
     patch.clicked.connect(lambda: setFGColor(color))
     return patch
 
-def createColorPatchRow(halfToneSet: HalfToneSet, style: dict) -> QWidget:
-    patches = [createColorPatch(tone, style) for tone in halfToneSet.tones]
-    widget, layout = addLayout(qlayout=QHBoxLayout, childWidgets=patches)
+def colorBarPatches(app: HalfToneSelectorApp, hts: HalfToneSet) -> K.QWidget:
+    patches = [colorBarPatch(app, tone) for tone in hts.tones]
+    widget, layout = addLayout(qlayout=K.QHBoxLayout, childWidgets=patches)
     widget.setStyleSheet(f'''
         QWidget {{
             border: 0px solid transparent;
             border-radius: 0px;
-            background-color: {style['background'].name()};
+            background-color: {app.style['background'].name()};
         }}
     ''')
     layout.setContentsMargins(1, 1, 1, 1)
     layout.setSpacing(1)
     return widget
 
-def createColorBarWidget(
-        halfToneSet: HalfToneSet,
-        style: dict,
-        parentLayout: QLayout,
-        s: AppState,
-        ) -> QWidget:
-    colorPatchRow = createColorPatchRow(halfToneSet, style)
-
-    line = QLineEdit(halfToneSet.name)
-    line.textChanged.connect(lambda text: setattr(halfToneSet, 'name', text))
+def colorBarName(app: HalfToneSelectorApp, hts: HalfToneSet) -> K.QLineEdit:
+    line = K.QLineEdit(hts.name)
+    line.textChanged.connect(lambda text: setattr(hts, 'name', text))
     font = line.font()
     font.setPointSize(8)
     line.setFont(font)
-    fm = QFontMetrics(line.font())
+    fm = K.QFontMetrics(line.font())
     line.setFixedHeight(fm.height())
     line.setStyleSheet(f'''
         QLineEdit {{
@@ -236,260 +218,159 @@ def createColorBarWidget(
             border: 0px solid transparent;
         }}
         QLineEdit::Hover {{
-            background-color: {style['background'].name()};
+            background-color: {app.style['background'].name()};
         }}
     ''')
+    return line
 
-    widgetV, layoutV = addLayout(
-        qlayout=QVBoxLayout,
-        childWidgets=[colorPatchRow, line])
-    widgetV.setStyleSheet(f'''
+def colorBarMain(app: HalfToneSelectorApp, hts: HalfToneSet) -> K.QWidget:
+    widget, layout = addLayout(
+        qlayout=K.QVBoxLayout,
+        childWidgets=[
+            colorBarPatches(app, hts),
+            colorBarName(app, hts),
+        ])
+    widget.setStyleSheet(f'''
         QWidget {{
-            background-color: {style['label'].name()};
+            background-color: {app.style['label'].name()};
         }}
     ''')
-    layoutV.setContentsMargins(5, 2, 5, 2)
-    layoutV.setSpacing(1)
+    layout.setContentsMargins(5, 2, 5, 2)
+    layout.setSpacing(1)
+    return widget
 
-    widget, layout = addLayout(qlayout=QHBoxLayout, childWidgets=[widgetV])
-    layout.setAlignment(Qt.AlignTop)
+def colorBarDelete(app: HalfToneSelectorApp, hts: HalfToneSet) -> K.QWidget:
+    button = K.QPushButton()
+    button.setIcon(K.Krita.instance().icon('deletelayer'))
+    button.setSizePolicy(K.QSizePolicy.Fixed, K.QSizePolicy.Fixed)
+    button.clicked.connect(lambda: app.removeHalfToneSet(hts))
+    return button
+
+def colorBarWidget(app: HalfToneSelectorApp, hts: HalfToneSet) -> K.QWidget:
+    widget, layout = addLayout(
+        qlayout=K.QHBoxLayout,
+        childWidgets=[
+            colorBarMain(app, hts),
+            colorBarDelete(app, hts),
+        ])
+    layout.setAlignment(K.Qt.AlignTop)
     layout.setContentsMargins(0, 0, 0, 0)
     layout.setSpacing(1)
-
-    def delete():
-        i = parentLayout.indexOf(widget)
-        s.halfTones.pop(i)
-        widget.deleteLater()
-
-    deleteButton = QPushButton()
-    deleteButton.setIcon(Krita.instance().icon('deletelayer'))
-    deleteButton.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
-    deleteButton.clicked.connect(delete)
-    layout.addWidget(deleteButton)
-
-    parentLayout.addWidget(widget)
     return widget
 
-def createToneGroup(s: AppState, style: dict) -> QWidget:
-    # Select light tone
-    #   Choice [FG | BG | Custom]
-    lightToneWidget = createSelectToneWidget(
-        'Light',
-        [
-            {'name': 'FG', 'getColor': getFGColor},
-            {'name': 'BG', 'getColor': getBGColor},
-        ],
-        lambda: s.light,
-        lambda tone: setattr(s, 'light', tone),
-        style,
-    )
-
-    # Select dark tone
-    #   Choice [Half | FG | BG | Custom]
-    darkToneWidget = createSelectToneWidget(
-        'Dark',
-        [
-            {'name': 'Half', 'getColor': lambda: oklchToQColor(halfLight(s))},
-            {'name': 'FG', 'getColor': getFGColor},
-            {'name': 'BG', 'getColor': getBGColor},
-        ],
-        lambda: s.dark,
-        lambda tone: setattr(s, 'dark', tone),
-        style,
-    )
-
-    # Chroma - Float
-    chromaInput, chromaWidget, _  = labeledInput('Chroma', QDoubleSpinBox)
-    chromaInput.setRange(-1, 1)
-    chromaInput.setSingleStep(0.05)
-    chromaInput.setValue(s.k)
-    chromaInput.valueChanged.connect(lambda d: setattr(s, 'k', d))
-
-    widget, layout = addLayout(
-        qlayout=QVBoxLayout,
-        qwidget=lambda: QGroupBox('Base Tones'),
-        childWidgets=[
-            lightToneWidget, darkToneWidget, chromaWidget,
-        ])
-    widget.setFlat(True)
-    layout.setContentsMargins(2, 2, 2, 2)
-    layout.setSpacing(5)
+def samplingCountWidget(app: HalfToneSelectorApp) -> K.QWidget:
+    spinBox, widget, _ = labeledInput('Count', K.QSpinBox)
+    spinBox.setRange(1, 10)
+    spinBox.setValue(app.s.count)
+    spinBox.valueChanged.connect(lambda i: app.setState(count=i))
     return widget
 
-def createEmitterGroup(s: AppState, style: dict) -> QWidget:
-    # Emitter
-    emitterWidget = createSelectToneWidget(
-        'Emitter',
-        [
-            {'name': 'Reset', 'getColor': lambda: QColor.fromRgbF(1.0, 1.0, 1.0)},
-            {'name': 'FG', 'getColor': getFGColor},
-            {'name': 'BG', 'getColor': getBGColor},
-        ],
-        lambda: s.emitter,
-        lambda tone: setattr(s, 'emitter', tone),
-        style,
-    )
+def toggleButton(name: str, state: bool, onClick: Callable[[], None]) -> K.QPushButton:
+    button = K.QPushButton(name)
+    button.setCheckable(True)
+    button.setChecked(state)
+    button.clicked.connect(onClick)
+    return button
 
-    # Normalize
-    normalizeInput, normalizeWidget, _ = labeledInput('Normalize', QCheckBox)
-    normalizeInput.setChecked(s.normalize)
-    normalizeInput.toggled.connect(lambda checked: setattr(s, 'normalize', checked))
+def samplingChoiceWidget(app: HalfToneSelectorApp) -> K.QWidget:
+    linear = toggleButton('Linear', not app.s.cos, lambda: app.setState(cos=False))
+    cosine = toggleButton('Cosine', app.s.cos, lambda: app.setState(cos=True))
 
-    # Intensity
-    intensityInput, intensityWidget, _  = labeledInput('Intensity', QDoubleSpinBox)
-    intensityInput.setRange(0, 1000)
-    intensityInput.setSingleStep(0.1)
-    intensityInput.setValue(s.intensity)
-    intensityInput.valueChanged.connect(lambda d: setattr(s, 'intensity', d))
+    def handleCos():
+        linear.setChecked(not app.s.cos)
+        cosine.setChecked(app.s.cos)
 
-    # White
-    whiteInput, whiteWidget, _  = labeledInput('White', QDoubleSpinBox)
-    whiteInput.setRange(0, 1)
-    whiteInput.setSingleStep(0.05)
-    whiteInput.setValue(s.white)
-    whiteInput.valueChanged.connect(lambda d: setattr(s, 'white', d))
+    app.registerCallback(['cos'], handleCos)
+    widget, layout = addLayout(qlayout=K.QHBoxLayout, childWidgets=[linear, cosine])
+    layout.setContentsMargins(0, 0, 0, 0)
+    return widget
 
+def samplingSettings(app: HalfToneSelectorApp) -> K.QWidget:
     widget, layout = addLayout(
-        qlayout=QVBoxLayout,
-        qwidget=lambda: QGroupBox('Emitter'),
+        qlayout=K.QVBoxLayout,
+        qwidget=lambda: K.QGroupBox('Sampling'),
         childWidgets=[
-            emitterWidget, normalizeWidget, intensityWidget, whiteWidget,
+            samplingCountWidget(app),
+            K.QLabel('Distribution:'),
+            samplingChoiceWidget(app),
         ])
     layout.setContentsMargins(2, 2, 2, 2)
     layout.setSpacing(5)
     return widget
 
-def createSamplingGroup(s: AppState, style: dict) -> QWidget:
-    # Select half tone count - Positive integer
-    countInput, countWidget, _ = labeledInput('Count', QSpinBox)
-    countInput.setRange(1, 10)
-    countInput.setValue(s.count)
-    countInput.valueChanged.connect(lambda i: setattr(s, 'count', i))
+def visCheckBox(app: HalfToneSelectorApp) -> K.QCheckBox:
+    def text():
+        return 'Settings (visible)' if app.visible else 'Settings (hidden)'
 
-    # Cosine - Toggle
-    cosineLabel = QLabel('Distribution:')
+    def handleToggle(box: K.QCheckBox, checked: bool):
+        app.visible = checked
+        box.setText(text())
 
-    linearButton = QPushButton('Linear')
-    linearButton.setCheckable(True)
-    linearButton.setChecked(not s.cos)
+    box = K.QCheckBox(text())
+    box.setChecked(app.visible)
+    box.toggled.connect(lambda checked: handleToggle(box, checked))
+    return box
 
-    cosineButton = QPushButton('Cosine')
-    cosineButton.setCheckable(True)
-    cosineButton.setChecked(s.cos)
-
-    def handleClicked(button, state: bool):
-        def _handleClicked():
-            linearButton.setChecked(False)
-            cosineButton.setChecked(False)
-            button.setChecked(True)
-            setattr(s, 'cos', state)
-        return _handleClicked
-
-    linearButton.clicked.connect(handleClicked(linearButton, False))
-    cosineButton.clicked.connect(handleClicked(cosineButton, True))
-
-    cosineWidget, cosineLayout = addLayout(
-        qlayout=QHBoxLayout,
-        childWidgets=[
-             linearButton, cosineButton,
-        ])
-    cosineLayout.setContentsMargins(0, 0, 0, 0)
-
-    widget, layout = addLayout(
-        qlayout=QVBoxLayout,
-        qwidget=lambda: QGroupBox('Sampling'),
-        childWidgets=[
-            countWidget, cosineLabel, cosineWidget,
-        ])
-    layout.setContentsMargins(2, 2, 2, 2)
-    layout.setSpacing(5)
-    return widget
-
-def getStyle() -> dict:
-    windowColor = getWindowColor()
-    isDark = windowColor.value() < 128
-    style = {
-        'window': windowColor,
-        'background': scaleColor(windowColor, 1, 8 if isDark else -8),
-        'label': scaleColor(windowColor, 1, 16 if isDark else -16),
-        'button': scaleColor(windowColor, 1, 32 if isDark else -32),
-    }
-    return style
-
-def createHalfToneSelectorWidget(s: AppState) -> QWidget:
-    style = getStyle()
-    toneGroup = createToneGroup(s, style)
-    # emitterGroup = createEmitterGroup(s, style)
-    samplingGroup = createSamplingGroup(s, style)
-
-    # Tones
-    #   Create half tones - Button
-    #   Color[0] Color[1] ...
-    toneWidget, toneLayout = addLayout(QVBoxLayout)
-    toneLayout.setContentsMargins(0, 0, 0, 0)
-    toneLayout.setSpacing(5)
-
+def settingsWidget(app: HalfToneSelectorApp) -> K.QWidget:
     def create():
-        halfToneSet = generateColors(s)
-        s.halfTones.append(halfToneSet)
-        createColorBarWidget(halfToneSet, style, toneLayout, s)
+        hts = generateColors(app.s)
+        app.addHalfToneSet(hts)
 
-    createButton = QPushButton('Create half tones')
+    createButton = K.QPushButton('Create half tones')
     createButton.clicked.connect(create)
 
-    for halfToneSet in s.halfTones:
-        createColorBarWidget(halfToneSet, style, toneLayout, s)
-
-    settingsWidget, settingsLayout = addLayout(
-        qlayout=QVBoxLayout,
+    widget, layout = addLayout(
+        qlayout=K.QVBoxLayout,
         childWidgets=[
-            toneGroup,
-            # emitterGroup,
-            samplingGroup,
+            toneSettings(app),
+            samplingSettings(app),
             createButton,
         ])
-    settingsLayout.setContentsMargins(0, 0, 0, 0)
-    settingsLayout.setSpacing(5)
-    settingsLayout.setAlignment(Qt.AlignTop)
+    layout.setContentsMargins(0, 0, 0, 0)
+    layout.setSpacing(5)
+    layout.setAlignment(K.Qt.AlignTop)
+    app.registerCallback(['visible'], lambda: widget.setVisible(app.visible))
+    return widget
 
-    visCheckBox = QCheckBox('Settings (visible)')
+def addScrollArea(widget: K.QWidget) -> K.QScrollArea:
+    scrollArea = K.QScrollArea()
+    scrollArea.setWidgetResizable(True)
+    scrollArea.setWidget(widget)
+    return scrollArea
 
-    def toggleVis(on: bool):
-        settingsWidget.setVisible(on)
-        visCheckBox.setText('Settings (visible)' if on else 'Settings (hidden)')
+def palette(app: HalfToneSelectorApp) -> K.QWidget:
+    colorBars = [colorBarWidget(app, hts) for hts in app.s.halfTones]
+    widget, layout = addLayout(qlayout=K.QVBoxLayout, childWidgets=colorBars)
+    layout.setContentsMargins(0, 0, 0, 0)
+    layout.setSpacing(5)
 
-    visCheckBox.setChecked(True)
-    visCheckBox.toggled.connect(toggleVis)
+    def handleAdd(i: int):
+        hts = app.s.halfTones[i]
+        layout.addWidget(colorBarWidget(app, hts))
 
-    mainWidget = createMainLayout(
+    def handleRemove(i: int):
+        item = layout.itemAt(i)
+        layout.removeItem(item)
+        item.widget().deleteLater()
+
+    app.registerCallback(['addHalfToneSet'], handleAdd)
+    app.registerCallback(['removeHalfToneSet'], handleRemove)
+    return widget
+
+def halfToneSelectorWidget(app: HalfToneSelectorApp) -> K.QWidget:
+    widget, layout = addLayout(
+        qlayout=K.QVBoxLayout,
         childWidgets=[
-            visCheckBox,
-            settingsWidget,
-            toneWidget,
-        ], style=style)
-    return mainWidget
-
-class HalfToneSelector(DockWidget):
-    def __init__(self):
-        super().__init__()
-        widget = createHalfToneSelectorWidget(S)
-        self.setWindowTitle('Half Tone Selector')
-        self.setWidget(widget)
-
-    # notifies when views are added or removed
-    def canvasChanged(self, canvas):
-        pass
-
-# Global state.
-S: AppState
-
-def registerPlugin():
-    global S
-    S = loadData()
-    instance = Krita.instance()
-
-    half_tone_selector_factory = DockWidgetFactory(
-        'half_tone_selector',
-        DockWidgetFactoryBase.DockRight,
-        HalfToneSelector)
-    instance.addDockWidgetFactory(half_tone_selector_factory)
+            visCheckBox(app),
+            settingsWidget(app),
+            palette(app),
+        ])
+    layout.setSpacing(5)
+    layout.setAlignment(K.Qt.AlignTop)
+    widget.setStyleSheet(f'''
+        QWidget {{
+            background-color: {app.style['background'].name()};
+        }}
+    ''')
+    scrollArea = addScrollArea(widget)
+    return scrollArea

@@ -38,6 +38,8 @@ class HalfToneSet:
             return HalfToneSet._old_from_dict(d)
         return HalfToneSet(**d)
 
+halfToneSetFields = {f.name for f in fields(HalfToneSet)}
+
 @dataclass
 class AppState:
     # [Oklch] Tone when fully lit.
@@ -103,6 +105,8 @@ class AppState:
         with path.open() as f:
             return AppState.from_dict(json.load(f))
 
+appStateFields = {f.name for f in fields(AppState)}
+
 def computeIntervals(n: int, useCos: bool) -> List[float]:
     intervals = [i / (n+1) for i in range(n+2)]
     if useCos:
@@ -129,7 +133,3 @@ def generateColors(s: AppState) -> HalfToneSet:
 
     # tones = [linearRgbToOklch(rgb) for rgb in finalLinears]
     return HalfToneSet(name='New', tones=lchs)
-
-def halfLight(s: AppState) -> Float3:
-    l, c, h = s.light
-    return [l/2, c, h]

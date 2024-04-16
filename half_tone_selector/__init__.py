@@ -1,6 +1,6 @@
 try:
-    from .widget import registerPlugin
+    from .half_tone_selector import HalfToneSelector
 
-    registerPlugin()
+    HalfToneSelector.addToKrita()
 except ModuleNotFoundError:
     pass

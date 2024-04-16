@@ -1,4 +1,3 @@
-from pathlib import Path
 from typing import (
     Callable,
     Optional,
@@ -11,7 +10,6 @@ from .color import (
     rgbToOklch,
     oklchToRgb,
 )
-from .state import AppState
 from krita import ( # type: ignore
     Krita,
     ManagedColor,
@@ -82,11 +80,10 @@ def qcolorToOklch(c: QColor) -> Float3:
     lch = rgbToOklch(rgb)
     return lch
 
-def loadData() -> AppState:
-    # Data store so state isn't lost when Krita closes.
-    dataPath = Path(__file__).resolve().parent / '_data.json'
-    s = AppState()
-    if dataPath.exists():
-        s = AppState.from_file(dataPath)
-    Krita.instance().notifier().applicationClosing.connect(lambda: s.to_file(dataPath))
-    return s
+def qcolorToOklchFunc(
+        getColor: Callable[[], Optional[QColor]],
+        ) -> Callable[[], Optional[Float3]]:
+    def _func():
+        color = getColor()
+        return qcolorToOklch(color) if color else None
+    return _func
