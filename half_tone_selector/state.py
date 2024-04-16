@@ -132,4 +132,4 @@ def generateColors(s: AppState) -> HalfToneSet:
     #     for e, rgb in zip(emitterIntervals, linears)]
 
     # tones = [linearRgbToOklch(rgb) for rgb in finalLinears]
-    return HalfToneSet(name='New', tones=lchs)
+    return HalfToneSet(name='', tones=lchs)

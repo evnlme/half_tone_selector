@@ -53,6 +53,11 @@ class HalfToneSelectorApp:
                 self._cbs[f] = set()
             self._cbs[f].add(cb)
 
+    def unregisterCallback(self, fields: List[str], cb: Callable[..., None]) -> None:
+        for f in fields:
+            if f in self._cbs:
+                self._cbs[f].remove(cb)
+
     @property
     def visible(self) -> bool:
         return self._visible

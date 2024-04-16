@@ -170,10 +170,7 @@ def toneSettings(app: HalfToneSelectorApp) -> K.QWidget:
     layout.setSpacing(5)
     return widget
 
-def colorBarPatch(app: HalfToneSelectorApp, lch: Float3) -> K.QPushButton:
-    patch = K.QPushButton()
-    patch.setMinimumSize(18, 18)
-    patch.setToolTip(str(lch))
+def updatePatchColor(app: HalfToneSelectorApp, patch: K.QWidget, lch: Float3) -> None:
     color = oklchToQColor(lch)
     patch.setStyleSheet(f'''
         QPushButton {{
@@ -186,6 +183,12 @@ def colorBarPatch(app: HalfToneSelectorApp, lch: Float3) -> K.QPushButton:
         }}
     ''')
     patch.clicked.connect(lambda: setFGColor(color))
+
+def colorBarPatch(app: HalfToneSelectorApp, lch: Float3) -> K.QPushButton:
+    patch = K.QPushButton()
+    patch.setMinimumSize(18, 18)
+    patch.setToolTip(str(lch))
+    updatePatchColor(app, patch, lch)
     return patch
 
 def colorBarPatches(app: HalfToneSelectorApp, hts: HalfToneSet) -> K.QWidget:
@@ -202,14 +205,18 @@ def colorBarPatches(app: HalfToneSelectorApp, hts: HalfToneSet) -> K.QWidget:
     layout.setSpacing(1)
     return widget
 
-def colorBarName(app: HalfToneSelectorApp, hts: HalfToneSet) -> K.QLineEdit:
-    line = K.QLineEdit(hts.name)
-    line.textChanged.connect(lambda text: setattr(hts, 'name', text))
+def setLineHeight(line: K.QLineEdit, pt: int) -> None:
     font = line.font()
-    font.setPointSize(8)
+    font.setPointSize(pt)
     line.setFont(font)
     fm = K.QFontMetrics(line.font())
     line.setFixedHeight(fm.height())
+
+def colorBarName(app: HalfToneSelectorApp, hts: HalfToneSet) -> K.QLineEdit:
+    line = K.QLineEdit(hts.name)
+    line.setPlaceholderText('Name')
+    line.textChanged.connect(lambda text: setattr(hts, 'name', text))
+    setLineHeight(line, 8)
     line.setStyleSheet(f'''
         QLineEdit {{
             font-size: 8pt;
@@ -221,6 +228,11 @@ def colorBarName(app: HalfToneSelectorApp, hts: HalfToneSet) -> K.QLineEdit:
             background-color: {app.style['background'].name()};
         }}
     ''')
+    def handleVisible():
+        return line.setVisible(app.visible or bool(line.text()))
+    app.registerCallback(['visible'], handleVisible)
+    line.destroyed.connect(
+        lambda: app.unregisterCallback(['visible'], handleVisible))
     return line
 
 def colorBarMain(app: HalfToneSelectorApp, hts: HalfToneSet) -> K.QWidget:
@@ -244,6 +256,11 @@ def colorBarDelete(app: HalfToneSelectorApp, hts: HalfToneSet) -> K.QWidget:
     button.setIcon(K.Krita.instance().icon('deletelayer'))
     button.setSizePolicy(K.QSizePolicy.Fixed, K.QSizePolicy.Fixed)
     button.clicked.connect(lambda: app.removeHalfToneSet(hts))
+    def handleVisible():
+        button.setVisible(app.visible)
+    app.registerCallback(['visible'], handleVisible)
+    button.destroyed.connect(
+        lambda: app.unregisterCallback(['visible'], handleVisible))
     return button
 
 def colorBarWidget(app: HalfToneSelectorApp, hts: HalfToneSet) -> K.QWidget:
@@ -311,6 +328,46 @@ def visCheckBox(app: HalfToneSelectorApp) -> K.QCheckBox:
     box.toggled.connect(lambda checked: handleToggle(box, checked))
     return box
 
+def updatePreviewPatches(app: HalfToneSelectorApp, patches: K.QWidget) -> None:
+    hts = generateColors(app.s)
+    patchesLayout = patches.layout().itemAt(0).widget().layout()
+    n = len(hts.tones)
+    m = patchesLayout.count()
+
+    for i in range(m):
+        patch = patchesLayout.itemAt(i).widget()
+        patch.setVisible(i < n)
+    for i, tone in zip(range(n), hts.tones):
+        if i < m:
+            patch = patchesLayout.itemAt(i).widget()
+            patch.clicked.disconnect()
+            updatePatchColor(app, patch, tone)
+        else:
+            patchesLayout.addWidget(colorBarPatch(app, tone))
+
+def previewPatches(app: HalfToneSelectorApp) -> K.QWidget:
+    hts = generateColors(app.s)
+    hts.name = 'Preview'
+    widget = colorBarMain(app, hts)
+    # Make name read only
+    widget.layout().itemAt(1).widget().setReadOnly(True)
+
+    app.registerCallback(
+        fields=['light', 'dark', 'k', 'count', 'cos'],
+        cb=lambda: updatePreviewPatches(app, widget))
+    return widget
+
+def previewSettings(app: HalfToneSelectorApp) -> K.QWidget:
+    widget, layout = addLayout(
+        qlayout=K.QVBoxLayout,
+        qwidget=lambda: K.QGroupBox('Preview'),
+        childWidgets=[
+            previewPatches(app),
+        ])
+    layout.setContentsMargins(2, 2, 2, 2)
+    layout.setSpacing(5)
+    return widget
+
 def settingsWidget(app: HalfToneSelectorApp) -> K.QWidget:
     def create():
         hts = generateColors(app.s)
@@ -324,6 +381,7 @@ def settingsWidget(app: HalfToneSelectorApp) -> K.QWidget:
         childWidgets=[
             toneSettings(app),
             samplingSettings(app),
+            previewSettings(app),
             createButton,
         ])
     layout.setContentsMargins(0, 0, 0, 0)
