@@ -1,3 +1,4 @@
+import math
 import krita as K # type: ignore
 from typing import Callable, Optional, List, Tuple
 from .lib import (
@@ -150,11 +151,66 @@ def toneDarkWidget(app: HalfToneSelectorApp) -> K.QWidget:
     return widget
 
 def toneChromaWidget(app: HalfToneSelectorApp) -> K.QDoubleSpinBox:
-    input, widget, _  = labeledInput('Chroma', K.QDoubleSpinBox)
+    input, widget, _  = labeledInput('Curve', K.QDoubleSpinBox)
     input.setRange(-1, 1)
     input.setSingleStep(0.05)
     input.setValue(app.s.k)
     input.valueChanged.connect(lambda d: app.setState(k=d))
+    return widget
+
+def toneNumbers(app: HalfToneSelectorApp, field: str) -> K.QWidget:
+    l, c, h = getattr(app.s, field)
+    def updateState(l, c, h):
+        l0, c0, h0 = getattr(app.s, field)
+        app.setState(**{field: (
+            l0 if l is None else l,
+            c0 if c is None else c,
+            h0 if h is None else h,
+        )})
+    def degrees(radians: float) -> float:
+        return math.degrees(radians) % 360
+    def radians(degrees: float) -> float:
+        return math.radians(degrees) % (2*math.pi)
+
+    lInput = K.QDoubleSpinBox()
+    lInput.setPrefix('L: ')
+    lInput.setRange(0, 1)
+    lInput.setSingleStep(0.050)
+    lInput.setDecimals(3)
+    lInput.setValue(l)
+    lInput.valueChanged.connect(lambda d: updateState(d, None, None))
+
+    cInput = K.QDoubleSpinBox()
+    cInput.setPrefix('C: ')
+    cInput.setRange(0, 0.333)
+    cInput.setSingleStep(0.010)
+    cInput.setDecimals(3)
+    cInput.setValue(c)
+    cInput.valueChanged.connect(lambda d: updateState(None, d, None))
+
+    hInput = K.QDoubleSpinBox()
+    hInput.setPrefix('H: ')
+    hInput.setRange(-10, 370)
+    hInput.setSingleStep(10)
+    hInput.setDecimals(0)
+    hInput.setValue(degrees(h))
+    hInput.valueChanged.connect(lambda d: updateState(None, None, radians(d)))
+
+    def handleUpdate():
+        l, c, h = getattr(app.s, field)
+        if not math.isclose(l, lInput.value()):
+            lInput.setValue(l)
+        if not math.isclose(c, cInput.value()):
+            cInput.setValue(c)
+        if not math.isclose(degrees(h), hInput.value()):
+            hInput.setValue(degrees(h))
+
+    app.registerCallback([field], handleUpdate)
+
+    childWidgets = [lInput, cInput, hInput]
+    widget, layout = addLayout(qlayout=K.QHBoxLayout, childWidgets=childWidgets)
+    layout.setContentsMargins(0, 0, 0, 0)
+    layout.setAlignment(K.Qt.AlignRight)
     return widget
 
 def toneSettings(app: HalfToneSelectorApp) -> K.QWidget:
@@ -163,7 +219,9 @@ def toneSettings(app: HalfToneSelectorApp) -> K.QWidget:
         qwidget=lambda: K.QGroupBox('Base Tones'),
         childWidgets=[
             toneLightWidget(app),
+            toneNumbers(app, 'light'),
             toneDarkWidget(app),
+            toneNumbers(app, 'dark'),
             toneChromaWidget(app),
         ])
     layout.setContentsMargins(2, 2, 2, 2)
@@ -182,12 +240,12 @@ def updatePatchColor(app: HalfToneSelectorApp, patch: K.QWidget, lch: Float3) ->
             border: 0.5px solid {app.style['background'].name()};
         }}
     ''')
+    patch.setToolTip(str(lch))
     patch.clicked.connect(lambda: setFGColor(color))
 
 def colorBarPatch(app: HalfToneSelectorApp, lch: Float3) -> K.QPushButton:
     patch = K.QPushButton()
     patch.setMinimumSize(18, 18)
-    patch.setToolTip(str(lch))
     updatePatchColor(app, patch, lch)
     return patch
 

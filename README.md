@@ -21,15 +21,25 @@ Please follow Krita's official docs for [installing a custom plugin](https://doc
 
 ## References
 
+Plugin development:
+
 * https://scripting.krita.org/lessons/plugins-create
-* https://github.com/kaichi1342/PaletteGenerator
 * https://api.kde.org/krita/html/index.html
 * https://doc.qt.io/qt-6/widget-classes.html
 * https://www.riverbankcomputing.com/static/Docs/PyQt6/index.html
 * https://invent.kde.org/graphics/krita/-/blob/master/plugins/python/plugin_importer/plugin_importer.py
+
+Plugins:
+
+* https://github.com/kaichi1342/PaletteGenerator
+* https://github.com/KnowZero/Krita-PythonPluginDeveloperTools/tree/main
+* https://github.com/EyeOdin/Pigment.O
+
+Color spaces:
+
 * https://developer.chrome.com/docs/css-ui/high-definition-css-color-guide
 * https://bottosson.github.io/posts/oklab/
-* https://github.com/KnowZero/Krita-PythonPluginDeveloperTools/tree/main
 * https://cie.co.at/data-tables
 * https://stackoverflow.com/questions/3407942/rgb-values-of-visible-spectrum
 * https://jcgt.org/published/0002/02/01/
+* https://oklch.com

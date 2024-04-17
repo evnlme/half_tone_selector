@@ -7,11 +7,19 @@ name = 'half_tone_selector'
 local_paths = [
     f'{name}.desktop',
     f'{name}/',
-    f'{name}/__init__.py',
-    f'{name}/lib.py',
-    f'{name}/Manual.html',
 ]
+
+def recursiveWrite(f: ZipFile, path: Path):
+    if path.name in ['__pycache__']:
+        return
+
+    name = path.relative_to(script_path)
+    print(path, '-->', name)
+    f.write(filename=path, arcname=name)
+    if path.is_dir():
+        for p in path.iterdir():
+            recursiveWrite(f, p)
 
 with ZipFile(script_path / f'{name}.zip', 'w') as f:
     for path in local_paths:
-        f.write(filename=script_path / path, arcname=path)
+        recursiveWrite(f, script_path / path)

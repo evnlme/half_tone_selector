@@ -46,7 +46,7 @@ class AppState:
     light: Float3 = field(default_factory=lambda: [0.5, 0, 0])
     # [Oklch] Tone when fully unlit (in shadow).
     dark: Float3 = field(default_factory=lambda: [0.25, 0, 0])
-    # Chroma control.
+    # Curve control.
     k: float = 1.0
     # [Oklch] Emitter.
     emitter: Float3 = field(default_factory=lambda: [1, 0, 0])
