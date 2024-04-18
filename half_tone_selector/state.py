@@ -41,6 +41,27 @@ class HalfToneSet:
 halfToneSetFields = {f.name for f in fields(HalfToneSet)}
 
 @dataclass
+class VisibleMeta:
+    """Metadata related to settings visibility.
+
+    The prior state's width and height are saved here.
+    Krita manages the width and height of the current state.
+    """
+    # Whether the settings are visible.
+    visible: bool = True
+    # If visible, widget width when hidden. If hidden, widget width when visible.
+    width: int = 0
+    # If visible, widget height when hidden. If hidden, height width when visible.
+    height: int = 0
+
+    def to_dict(self) -> dict:
+        return {f.name: getattr(self, f.name) for f in fields(VisibleMeta)}
+
+    @staticmethod
+    def from_dict(d: dict) -> 'VisibleMeta':
+        return VisibleMeta(**d)
+
+@dataclass
 class AppState:
     # [Oklch] Tone when fully lit.
     light: Float3 = field(default_factory=lambda: [0.5, 0, 0])
@@ -62,11 +83,15 @@ class AppState:
     cos: bool = True
     # Half tones.
     halfTones: List[HalfToneSet] = field(default_factory=list)
+    # Settings visibility metadata
+    visibleMeta: VisibleMeta = field(default_factory=VisibleMeta)
 
     def to_dict(self) -> dict:
         def serialize(name: str):
             if name == 'halfTones':
                 return [hts.to_dict() for hts in self.halfTones]
+            elif name == 'visibleMeta':
+                return self.visibleMeta.to_dict()
             else:
                 return getattr(self, name)
         return {
@@ -90,6 +115,8 @@ class AppState:
                 if f.name == 'halfTones':
                     halfToneSets = [HalfToneSet.from_dict(hts) for hts in d[f.name]]
                     setattr(s, f.name, halfToneSets)
+                elif f.name == 'visibleMeta':
+                    setattr(s, f.name, VisibleMeta.from_dict(d[f.name]))
                 elif f.name in ('light', 'dark', 'emitter'):
                     if isinstance(d[f.name], str):
                         # Backwards compatibility.

@@ -33,8 +33,6 @@ class HalfToneSelectorApp:
         self.s = s
         # Style settings for widgets.
         self.style = getStyle()
-        # If settings are visible, True. If settings are hidden, False.
-        self._visible = True
         self._cbs: Dict[str, Set[Callable[..., None]]] = {}
 
     def setState(self, **kwargs) -> None:
@@ -60,11 +58,11 @@ class HalfToneSelectorApp:
 
     @property
     def visible(self) -> bool:
-        return self._visible
+        return self.s.visibleMeta.visible
 
     @visible.setter
     def visible(self, value: bool) -> None:
-        self._visible = value
+        self.s.visibleMeta.visible = value
         for cb in self._cbs.get('visible', []):
             cb()
 

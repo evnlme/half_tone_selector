@@ -288,6 +288,7 @@ def colorBarName(app: HalfToneSelectorApp, hts: HalfToneSet) -> K.QLineEdit:
     ''')
     def handleVisible():
         return line.setVisible(app.visible or bool(line.text()))
+    handleVisible()
     app.registerCallback(['visible'], handleVisible)
     line.destroyed.connect(
         lambda: app.unregisterCallback(['visible'], handleVisible))
@@ -316,6 +317,7 @@ def colorBarDelete(app: HalfToneSelectorApp, hts: HalfToneSet) -> K.QWidget:
     button.clicked.connect(lambda: app.removeHalfToneSet(hts))
     def handleVisible():
         button.setVisible(app.visible)
+    handleVisible()
     app.registerCallback(['visible'], handleVisible)
     button.destroyed.connect(
         lambda: app.unregisterCallback(['visible'], handleVisible))
@@ -445,6 +447,7 @@ def settingsWidget(app: HalfToneSelectorApp) -> K.QWidget:
     layout.setContentsMargins(0, 0, 0, 0)
     layout.setSpacing(5)
     layout.setAlignment(K.Qt.AlignTop)
+    widget.setVisible(app.visible)
     app.registerCallback(['visible'], lambda: widget.setVisible(app.visible))
     return widget
 

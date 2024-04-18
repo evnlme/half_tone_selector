@@ -18,13 +18,26 @@ def loadAppState() -> AppState:
 class HalfToneSelector(K.DockWidget):
     def __init__(self, app: HalfToneSelectorApp) -> None:
         super().__init__()
+        self.app = app
         self.setWindowTitle('Half Tone Selector')
         widget = halfToneSelectorWidget(app)
         self.setWidget(widget)
 
+        app.registerCallback(['visible'], self.handleVisible)
+
     # notifies when views are added or removed
     def canvasChanged(self, canvas):
         pass
+
+    def handleVisible(self) -> None:
+        tempWidth = self.width()
+        tempHeight = self.height()
+        w = self.app.s.visibleMeta.width
+        h = self.app.s.visibleMeta.height
+        if w and h:
+            self.resize(w, h)
+        self.app.s.visibleMeta.width = tempWidth
+        self.app.s.visibleMeta.height = tempHeight
 
     @staticmethod
     def addToKrita() -> None:
