@@ -2,7 +2,7 @@
 
 This plugin generates half tones from user defined light and dark tones. It is useful for shading and practice. If you know the angle between the light rays and what you are drawing, you will know which tone to use. By default, 5 half tones are generated at 15, 30, 45, 60, and 75 degrees. The light and dark tones correspond to 0 and 90 degrees.
 
-![Default](./selection.png)
+![Default](./images/selection.png)
 
 ## Usage
 
@@ -20,7 +20,7 @@ Please follow Krita's official docs for [installing a custom plugin](https://doc
 
 ## Example
 
-![Example](./example01.png)
+![Example](./images/example01.png)
 
 ## Tech
 
@@ -38,7 +38,7 @@ There are many paths that connect two points in the polar coordinate space. I id
 
 The inbetween paths are generated as a linear interpolation of the key paths.
 
-![Curves](./curves.png)
+![Curves](./images/curves.png)
 
 The current method works when chroma is the same. But when chroma is different, it's not as elegant. The key paths may need to be reevaluated.
 
