@@ -51,6 +51,8 @@ Plugin development:
 * https://doc.qt.io/qt-6/widget-classes.html
 * https://www.riverbankcomputing.com/static/Docs/PyQt6/index.html
 * https://invent.kde.org/graphics/krita/-/blob/master/plugins/python/plugin_importer/plugin_importer.py
+* https://registry.khronos.org/OpenGL-Refpages/gl4/index.php
+* https://numpy.org/doc/stable/reference/index.html
 
 Plugins:
 
@@ -66,3 +68,5 @@ Color spaces:
 * https://stackoverflow.com/questions/3407942/rgb-values-of-visible-spectrum
 * https://jcgt.org/published/0002/02/01/
 * https://oklch.com
+* https://en.wikipedia.org/wiki/Color_difference
+* https://en.wikipedia.org/wiki/CIELAB_color_space

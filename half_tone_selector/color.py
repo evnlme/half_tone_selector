@@ -1,8 +1,9 @@
-from math import atan2, sqrt, cos, sin, pi, hypot
+from math import atan2, sqrt, cos, sin, pi, hypot, dist
 from .lib import (
     Float3,
     multiply,
     interp,
+    clamp,
 )
 
 def fromHexRgb(rgb: str) -> Float3:
@@ -91,7 +92,8 @@ def oklchToRgb(lch: Float3) -> Float3:
     """Oklch to sRGB"""
     lab = fromOklch(lch)
     linear = fromOklab(lab)
-    rgb = fromLinearRgb(linear)
+    clamped = [clamp(0, 1, x) for x in linear]
+    rgb = fromLinearRgb(clamped)
     return rgb
 
 def linearRgbToOklch(linearRgb: Float3) -> Float3:
@@ -105,6 +107,12 @@ def oklchToLinearRgb(lch: Float3) -> Float3:
     lab = fromOklch(lch)
     linear = fromOklab(lab)
     return linear
+
+def getColorError(lab: Float3) -> float:
+    linear = fromOklab(lab)
+    clampedLinear = [clamp(0, 1, x) for x in linear]
+    clampedLab = toOklab(clampedLinear)
+    return dist(lab, clampedLab)
 
 def interpolateOklch(lch1: Float3, lch2: Float3, t: float, k: float) -> Float3:
     # t: [0, 1], k: [-1, 1]

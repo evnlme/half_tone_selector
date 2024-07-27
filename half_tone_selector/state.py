@@ -53,6 +53,8 @@ class VisibleMeta:
     width: int = 0
     # If visible, widget height when hidden. If hidden, height width when visible.
     height: int = 0
+    # When visible, widths of the left and right widgets.
+    splitterSizes: List[int] = field(default_factory=lambda: [1, 1])
 
     def to_dict(self) -> dict:
         return {f.name: getattr(self, f.name) for f in fields(VisibleMeta)}

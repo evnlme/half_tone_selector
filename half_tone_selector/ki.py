@@ -71,8 +71,7 @@ def scaleColor(color: QColor, scale: float, b: int = 0) -> QColor:
 
 def oklchToQColor(lch: Float3) -> QColor:
     rgb = oklchToRgb(lch)
-    rgbClamp = [clamp(0, 1, x) for x in rgb]
-    c = QColor.fromRgbF(*rgbClamp)
+    c = QColor.fromRgbF(*rgb)
     return c
 
 def qcolorToOklch(c: QColor) -> Float3:

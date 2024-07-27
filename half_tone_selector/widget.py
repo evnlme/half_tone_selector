@@ -476,20 +476,39 @@ def palette(app: HalfToneSelectorApp) -> K.QWidget:
     app.registerCallback(['removeHalfToneSet'], handleRemove)
     return widget
 
-def halfToneSelectorWidget(app: HalfToneSelectorApp) -> K.QWidget:
-    widget, layout = addLayout(
-        qlayout=K.QVBoxLayout,
-        childWidgets=[
-            visCheckBox(app),
-            settingsWidget(app),
-            palette(app),
-        ])
-    layout.setSpacing(5)
-    layout.setAlignment(K.Qt.AlignTop)
-    widget.setStyleSheet(f'''
-        QWidget {{
-            background-color: {app.style['background'].name()};
-        }}
-    ''')
-    scrollArea = addScrollArea(widget)
-    return scrollArea
+from .toneSettings import toneSettings as ts
+
+class HalfToneSelectorWidget(K.QSplitter):
+    def __init__(self, app: HalfToneSelectorApp) -> None:
+        super().__init__()
+        self._app = app
+        self._label = K.QLabel()
+        widget, layout = addLayout(
+            qlayout=K.QVBoxLayout,
+            childWidgets=[
+                visCheckBox(app),
+                settingsWidget(app),
+                palette(app),
+                self._label,
+            ])
+        layout.setSpacing(5)
+        layout.setAlignment(K.Qt.AlignTop)
+        widget.setStyleSheet(f'''
+            QWidget {{
+                background-color: {app.style['background'].name()};
+            }}
+        ''')
+        tsVisuals = ts(app)
+        self.addWidget(addScrollArea(widget))
+        self.addWidget(tsVisuals)
+
+        self.setSizes(self._app.s.visibleMeta.splitterSizes)
+        self.splitterMoved.connect(lambda pos, index: self._updateSplitterSizes())
+
+        tsVisuals.setVisible(app.visible)
+        app.registerCallback(['visible'], lambda: tsVisuals.setVisible(app.visible))
+
+    def _updateSplitterSizes(self) -> None:
+        if self._app.visible:
+            self._app.s.visibleMeta.splitterSizes = self.sizes()
+            self._label.setText(str(self._app.s.visibleMeta.splitterSizes))

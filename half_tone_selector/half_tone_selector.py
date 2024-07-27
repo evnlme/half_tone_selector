@@ -2,11 +2,11 @@ import krita as K # type: ignore
 from pathlib import Path
 from .state import AppState
 from .app import HalfToneSelectorApp
-from .widget import halfToneSelectorWidget
+from .widget import HalfToneSelectorWidget
 
 def loadAppState() -> AppState:
     # Data store so state isn't lost when Krita closes.
-    dataPath = Path(__file__).resolve().parent / '_data.json'
+    dataPath = Path(__file__).resolve().parent.parent / 'half_tone_selector_data.json'
     s = AppState()
     if dataPath.exists():
         s = AppState.from_file(dataPath)
@@ -20,8 +20,8 @@ class HalfToneSelector(K.DockWidget):
         super().__init__()
         self.app = app
         self.setWindowTitle('Half Tone Selector')
-        widget = halfToneSelectorWidget(app)
-        self.setWidget(widget)
+        self._appWidget = HalfToneSelectorWidget(app)
+        self.setWidget(self._appWidget)
 
         app.registerCallback(['visible'], self.handleVisible)
 
