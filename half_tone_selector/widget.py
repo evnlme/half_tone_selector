@@ -482,14 +482,12 @@ class HalfToneSelectorWidget(K.QSplitter):
     def __init__(self, app: HalfToneSelectorApp) -> None:
         super().__init__()
         self._app = app
-        self._label = K.QLabel()
         widget, layout = addLayout(
             qlayout=K.QVBoxLayout,
             childWidgets=[
                 visCheckBox(app),
                 settingsWidget(app),
                 palette(app),
-                self._label,
             ])
         layout.setSpacing(5)
         layout.setAlignment(K.Qt.AlignTop)
@@ -511,4 +509,3 @@ class HalfToneSelectorWidget(K.QSplitter):
     def _updateSplitterSizes(self) -> None:
         if self._app.visible:
             self._app.s.visibleMeta.splitterSizes = self.sizes()
-            self._label.setText(str(self._app.s.visibleMeta.splitterSizes))
