@@ -20,8 +20,7 @@ from .gl import (
     createProgram,
 )
 from .color import (
-    toOklch,
-    fromOklch,
+    convertColorSpace,
     getColorError,
 )
 from .app import (
@@ -39,13 +38,13 @@ class ChromaHueSelector(QOpenGLWidget):
         self._changeCallback = lambda: True
 
         def updateColor1():
-            self._color1 = fromOklch(app.s.light)
+            self._color1 = convertColorSpace(app.s.light, 'Oklch', 'Oklab')
             self._activeColor = 1
             self.colorError = getColorError(self._color1)
             self._changeCallback()
 
         def updateColor2():
-            self._color2 = fromOklch(app.s.dark)
+            self._color2 = convertColorSpace(app.s.dark, 'Oklch', 'Oklab')
             self._activeColor = 2
             self.colorError = getColorError(self._color2)
             self._changeCallback()
@@ -138,7 +137,7 @@ class ChromaHueSelector(QOpenGLWidget):
         else: # self._activeColor == 2
             lightness = self._color2[0]
         color = [lightness, coord[0], coord[1]]
-        lch = toOklch(color)
+        lch = convertColorSpace(color, 'Oklab', 'Oklch')
         if self._activeColor == 1:
             self._app.setState(light=lch)
         else: # self._activeColor == 2
@@ -186,11 +185,11 @@ class LightnessSelector(QOpenGLWidget):
         self._isMousePressed = False
 
         def updateColor1():
-            self._color1 = fromOklch(app.s.light)
+            self._color1 = convertColorSpace(app.s.light, 'Oklch', 'Oklab')
             self._activeColor = 1
 
         def updateColor2():
-            self._color2 = fromOklch(app.s.dark)
+            self._color2 = convertColorSpace(app.s.dark, 'Oklch', 'Oklab')
             self._activeColor = 2
 
         app.registerCallback(['dark'], updateColor2)
@@ -234,7 +233,7 @@ class LightnessSelector(QOpenGLWidget):
         else: # self._activeColor == 2
             ab = self._color2[1:]
         color = [coord, *ab]
-        lch = toOklch(color)
+        lch = convertColorSpace(color, 'Oklab', 'Oklch')
         if self._activeColor == 1:
             self._app.setState(light=lch)
         else: # self._activeColor == 2

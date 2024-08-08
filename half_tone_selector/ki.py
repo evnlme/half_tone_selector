@@ -2,13 +2,12 @@ from typing import (
     Callable,
     Optional,
 )
-from .lib import (
-    Float3,
+from .matrix import (
+    Vec,
     clamp,
 )
 from .color import (
-    rgbToOklch,
-    oklchToRgb,
+    convertColorSpace,
 )
 from krita import ( # type: ignore
     Krita,
@@ -66,22 +65,22 @@ def getWindowColor() -> QColor:
 
 def scaleColor(color: QColor, scale: float, b: int = 0) -> QColor:
     rgb = color.getRgb()[:3]
-    scaledRgb = [round(clamp(0, 255, x*scale + b)) for x in rgb]
+    scaledRgb = [round(clamp(x*scale + b, 0, 255)) for x in rgb]
     return QColor(*scaledRgb)
 
-def oklchToQColor(lch: Float3) -> QColor:
-    rgb = oklchToRgb(lch)
+def oklchToQColor(lch: Vec) -> QColor:
+    rgb = convertColorSpace(lch, 'Oklch', 'sRGB')
     c = QColor.fromRgbF(*rgb)
     return c
 
-def qcolorToOklch(c: QColor) -> Float3:
+def qcolorToOklch(c: QColor) -> Vec:
     rgb = list(c.getRgbF()[:3])
-    lch = rgbToOklch(rgb)
+    lch = convertColorSpace(rgb, 'sRGB', 'Oklch')
     return lch
 
 def qcolorToOklchFunc(
         getColor: Callable[[], Optional[QColor]],
-        ) -> Callable[[], Optional[Float3]]:
+        ) -> Callable[[], Optional[Vec]]:
     def _func():
         color = getColor()
         return qcolorToOklch(color) if color else None

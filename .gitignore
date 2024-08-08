@@ -3,3 +3,4 @@ __pycache__
 .ipynb_checkpoints
 .mypy_cache
 .venv
+half_tone_selector_data.json

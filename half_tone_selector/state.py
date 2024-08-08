@@ -3,23 +3,18 @@ from dataclasses import dataclass, field, fields
 from math import cos, pi
 from pathlib import Path
 from typing import List
-from .lib import (
-    Float3,
-    interp3,
-    scale3,
+from .matrix import (
+    Vec,
 )
 from .color import (
-    fromHexRgb,
-    rgbToOklch,
-    linearRgbToOklch,
-    oklchToLinearRgb,
     interpolateOklch,
+    convertColorSpace
 )
 
 @dataclass
 class HalfToneSet:
     name: str
-    tones: List[Float3]
+    tones: List[Vec]
 
     def to_dict(self) -> dict:
         return {f.name: getattr(self, f.name) for f in fields(HalfToneSet)}
@@ -29,7 +24,7 @@ class HalfToneSet:
         """Old version used a list of rgb hex strings."""
         return HalfToneSet(
             name='Migrated',
-            tones=[rgbToOklch(fromHexRgb(tone)) for tone in d])
+            tones=[convertColorSpace(tone, 'StringRGB', 'Oklch') for tone in d])
 
     @staticmethod
     def from_dict(d: dict) -> 'HalfToneSet':
@@ -66,13 +61,13 @@ class VisibleMeta:
 @dataclass
 class AppState:
     # [Oklch] Tone when fully lit.
-    light: Float3 = field(default_factory=lambda: [0.5, 0, 0])
+    light: Vec = field(default_factory=lambda: [0.5, 0, 0])
     # [Oklch] Tone when fully unlit (in shadow).
-    dark: Float3 = field(default_factory=lambda: [0.25, 0, 0])
+    dark: Vec = field(default_factory=lambda: [0.25, 0, 0])
     # Curve control.
     k: float = 1.0
     # [Oklch] Emitter.
-    emitter: Float3 = field(default_factory=lambda: [1, 0, 0])
+    emitter: Vec = field(default_factory=lambda: [1, 0, 0])
     # Normalize the emitter lightness to 1.
     normalize: bool = True
     # Intensity of the emitter.
@@ -122,7 +117,8 @@ class AppState:
                 elif f.name in ('light', 'dark', 'emitter'):
                     if isinstance(d[f.name], str):
                         # Backwards compatibility.
-                        setattr(s, f.name, rgbToOklch(fromHexRgb(d[f.name])))
+                        lch = convertColorSpace(d[f.name], 'StringRGB', 'Oklch')
+                        setattr(s, f.name, lch)
                     else:
                         setattr(s, f.name, d[f.name])
                 else:
@@ -139,8 +135,7 @@ appStateFields = {f.name for f in fields(AppState)}
 def computeIntervals(n: int, useCos: bool) -> List[float]:
     intervals = [i / (n+1) for i in range(n+2)]
     if useCos:
-        # Cos for linear. Cos**(1/3) for oklch.
-        return [cos(x * pi / 2)**(1/3) for x in intervals]
+        return [cos(x * pi / 2) for x in intervals]
     else:
         return list(reversed(intervals))
 

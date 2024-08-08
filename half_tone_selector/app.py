@@ -4,8 +4,8 @@ from typing import (
     List,
     Set,
 )
-from .lib import (
-    Float3,
+from .matrix import (
+    Vec,
 )
 from .state import (
     AppState,
@@ -66,9 +66,9 @@ class HalfToneSelectorApp:
         for cb in self._cbs.get('visible', []):
             cb()
 
-    def halfLight(self) -> Float3:
+    def halfLight(self) -> Vec:
         l, c, h = self.s.light
-        return [l/2, c, h]
+        return [l/2, c/2, h]
 
     def addHalfToneSet(self, hts: HalfToneSet) -> int:
         i = len(self.s.halfTones)

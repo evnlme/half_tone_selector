@@ -1,8 +1,8 @@
 import math
 import krita as K # type: ignore
 from typing import Callable, Optional, List, Tuple
-from .lib import (
-    Float3,
+from .matrix import (
+    Vec,
 )
 from .state import (
     HalfToneSet,
@@ -228,7 +228,7 @@ def toneSettings(app: HalfToneSelectorApp) -> K.QWidget:
     layout.setSpacing(5)
     return widget
 
-def updatePatchColor(app: HalfToneSelectorApp, patch: K.QWidget, lch: Float3) -> None:
+def updatePatchColor(app: HalfToneSelectorApp, patch: K.QWidget, lch: Vec) -> None:
     color = oklchToQColor(lch)
     patch.setStyleSheet(f'''
         QPushButton {{
@@ -243,7 +243,7 @@ def updatePatchColor(app: HalfToneSelectorApp, patch: K.QWidget, lch: Float3) ->
     patch.setToolTip(str(lch))
     patch.clicked.connect(lambda: setFGColor(color))
 
-def colorBarPatch(app: HalfToneSelectorApp, lch: Float3) -> K.QPushButton:
+def colorBarPatch(app: HalfToneSelectorApp, lch: Vec) -> K.QPushButton:
     patch = K.QPushButton()
     patch.setMinimumSize(18, 18)
     updatePatchColor(app, patch, lch)

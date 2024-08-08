@@ -1,3 +1,4 @@
+import re
 from ctypes import CFUNCTYPE, c_int, c_uint, c_float, c_void_p, POINTER
 from pathlib import Path
 from PyQt5.QtGui import ( # type: ignore
@@ -70,6 +71,8 @@ def createShader(shaderType: int, code: str) -> QOpenGLShader:
         raise Exception(shader.log())
     return shader
 
+_includePat = re.compile(r'^#include "(\w+\.glsl)"', flags=re.MULTILINE)
+
 def loadShader(context: QOpenGLContext, name: Path) -> QOpenGLShader:
     if name.suffix == '.vert':
         shaderType = QOpenGLShader.Vertex
@@ -80,7 +83,14 @@ def loadShader(context: QOpenGLContext, name: Path) -> QOpenGLShader:
     versionHeader = getVersionHeader(context)
     with name.open() as f:
         code = f.read()
-    return createShader(shaderType, versionHeader + code)
+    tokens = _includePat.split(code)
+    for i in range(len(tokens)):
+        if tokens[i].endswith('.glsl'):
+            includePath = name.parent / tokens[i]
+            with includePath.open() as f:
+                includeCode = f.read()
+            tokens[i] = includeCode
+    return createShader(shaderType, versionHeader + ''.join(tokens))
 
 def createProgram(vertexShader: QOpenGLShader, fragmentShader: QOpenGLShader) -> QOpenGLShaderProgram:
     prog = QOpenGLShaderProgram()

@@ -1,18 +1,23 @@
 from math import atan2, sqrt, cos, sin, pi, hypot, dist
-from .lib import (
-    Float3,
-    multiply,
-    interp,
+from .matrix import (
+    Vec,
+    Mat,
     clamp,
+    invertMat,
+    transposeMat,
+    multMat,
+    multMatVec,
+    scaleVec,
 )
+from .autocomp import createComps
 
-def fromHexRgb(rgb: str) -> Float3:
+def fromHexRgb(rgb: str) -> Vec:
     # #RRGGBB
     # 0123456
     return [int(rgb[2*x+1:2*x+3], 16) / 255 for x in range(3)]
 
 # For transfer function: https://bottosson.github.io/posts/colorwrong/
-def fromLinearRgb(linearRgb: Float3) -> Float3:
+def fromLinearRgb(linearRgb: Vec) -> Vec:
     """Linear RGB to sRGB"""
     def fromLinear(x: float) -> float:
         # [0, 1] -> [0, 1]
@@ -20,9 +25,9 @@ def fromLinearRgb(linearRgb: Float3) -> Float3:
             return (1.055) * x**(1.0/2.4) - 0.055
         else:
             return 12.92 * x
-    return [fromLinear(x) for x in linearRgb]
+    return [fromLinear(clamp(x, 0, 1)) for x in linearRgb]
 
-def toLinearRgb(rgb: Float3) -> Float3:
+def toLinearRgb(rgb: Vec) -> Vec:
     """sRGB to Linear RGB"""
     def toLinear(x: float) -> float:
         # [0, 1] -> [0, 1]
@@ -32,89 +37,98 @@ def toLinearRgb(rgb: Float3) -> Float3:
             return x / 12.92
     return [toLinear(x) for x in rgb]
 
-# For oklab: https://bottosson.github.io/posts/oklab/
-def toOklab(linearRgb: Float3) -> Float3:
-    """Linear RGB to Oklab"""
-    mat1 = [
-        [0.4122214708, 0.5363325363, 0.0514459929],
-        [0.2119034982, 0.6806995451, 0.1073969566],
-        [0.0883024619, 0.2817188376, 0.6299787005],
+def deriveRgbToXyzMat() -> Mat:
+    """
+    Primaries: https://github.com/colour-science/colour/blob/develop/colour/models/rgb/datasets/srgb.py
+    Whitepoint: https://github.com/colour-science/colour/blob/develop/colour/colorimetry/datasets/illuminants/chromaticity_coordinates.py
+    """
+    primaries = [
+        [0.64, 0.33],
+        [0.30, 0.60],
+        [0.15, 0.06],
     ]
-    mat2 = [
-        [0.2104542553,  0.7936177850, -0.0040720468],
-        [1.9779984951, -2.4285922050,  0.4505937099],
-        [0.0259040371,  0.7827717662, -0.8086757660],
-    ]
-    x1 = multiply(mat1, linearRgb)
-    x2 = [x**(1/3) for x in x1]
-    lab = multiply(mat2, x2)
+    for p in primaries:
+        p.append(1.0-sum(p))
+    primaries = transposeMat(primaries)
+    whitepoint = [0.3127, 0.3290]
+    whitepoint.append(1.0-sum(whitepoint))
+    whitepoint = [w/whitepoint[1] for w in whitepoint]
+    coeff = multMatVec(invertMat(primaries), whitepoint)
+    return [[xi*c for xi, c in zip(row, coeff)] for row in primaries]
+
+_rgbToXyzMat = deriveRgbToXyzMat()
+_xyzToRgbMat = invertMat(_rgbToXyzMat)
+
+def convertLinearRgbToXyz(linearRgb: Vec) -> Vec:
+    return multMatVec(_rgbToXyzMat, linearRgb)
+
+def convertXyzToLinearRgb(xyz: Vec) -> Vec:
+    return multMatVec(_xyzToRgbMat, xyz)
+
+# https://colour.readthedocs.io/en/latest/_modules/colour/models/oklab.html
+_xyzToLmsMat = [
+    [0.8189330101, 0.3618667424,-0.1288597137],
+    [0.0329845436, 0.9293118715, 0.0361456387],
+    [0.0482003018, 0.2643662691, 0.6338517070],
+]
+_lmsToOklabMat = [
+    [0.2104542553, 0.7936177850,-0.0040720468],
+    [1.9779984951,-2.4285922050, 0.4505937099],
+    [0.0259040371, 0.7827717662,-0.8086757660],
+]
+_lmsToXyzMat = invertMat(_xyzToLmsMat)
+_oklabToLmsMat = invertMat(_lmsToOklabMat)
+
+def toOklab(xyz: Vec) -> Vec:
+    """XYZ to Oklab"""
+    lms1 = multMatVec(_xyzToLmsMat, xyz)
+    lms2 = [x**(1/3) for x in lms1]
+    lab = multMatVec(_lmsToOklabMat, lms2)
     return lab
 
-def fromOklab(lab: Float3) -> Float3:
-    """Oklab to linear RGB"""
-    mat1 = [
-        [1,  0.3963377774,  0.2158037573],
-        [1, -0.1055613458, -0.0638541728],
-        [1, -0.0894841775, -1.2914855480],
-    ]
-    mat2 = [
-        [ 4.0767416621, -3.3077115913,  0.2309699292],
-        [-1.2684380046,  2.6097574011, -0.3413193965],
-        [-0.0041960863, -0.7034186147,  1.7076147010],
-    ]
-    x1 = multiply(mat1, lab)
-    x2 = [x**3 for x in x1]
-    linearRgb = multiply(mat2, x2)
-    return linearRgb
+def fromOklab(lab: Vec) -> Vec:
+    """Oklab to XYZ"""
+    lms2 = multMatVec(_oklabToLmsMat, lab)
+    lms1 = [x**3 for x in lms2]
+    xyz = multMatVec(_lmsToXyzMat, lms1)
+    return xyz
 
-def toOklch(lab: Float3) -> Float3:
+def toOklch(lab: Vec) -> Vec:
     """Oklab to Oklch"""
     l, a, b = lab
     c = hypot(a, b)
     h = atan2(b, a)
     return [l, c, h]
 
-def fromOklch(lch: Float3) -> Float3:
+def fromOklch(lch: Vec) -> Vec:
     """Oklch to Oklab"""
     l, c, h = lch
     a = c * cos(h)
     b = c * sin(h)
     return [l, a, b]
 
-def rgbToOklch(rgb: Float3) -> Float3:
-    """sRGB to Oklch"""
-    linear = toLinearRgb(rgb)
-    lab = toOklab(linear)
-    lch = toOklch(lab)
-    return lch
+convertColorSpace = createComps([
+    (fromHexRgb, 'StringRGB', 'sRGB'),
+    (fromLinearRgb, 'LinearRGB', 'sRGB'),
+    (toLinearRgb, 'sRGB', 'LinearRGB'),
+    (convertLinearRgbToXyz, 'LinearRGB', 'XYZ'),
+    (convertXyzToLinearRgb, 'XYZ', 'LinearRGB'),
+    (toOklab, 'XYZ', 'Oklab'),
+    (fromOklab, 'Oklab', 'XYZ'),
+    (toOklch, 'Oklab', 'Oklch'),
+    (fromOklch, 'Oklch', 'Oklab'),
+])
 
-def oklchToRgb(lch: Float3) -> Float3:
-    """Oklch to sRGB"""
-    lab = fromOklch(lch)
-    linear = fromOklab(lab)
-    clamped = [clamp(0, 1, x) for x in linear]
-    rgb = fromLinearRgb(clamped)
-    return rgb
-
-def linearRgbToOklch(linearRgb: Float3) -> Float3:
-    """sRGB to Oklch"""
-    lab = toOklab(linearRgb)
-    lch = toOklch(lab)
-    return lch
-
-def oklchToLinearRgb(lch: Float3) -> Float3:
-    """Oklch to linear RGB"""
-    lab = fromOklch(lch)
-    linear = fromOklab(lab)
-    return linear
-
-def getColorError(lab: Float3) -> float:
-    linear = fromOklab(lab)
-    clampedLinear = [clamp(0, 1, x) for x in linear]
-    clampedLab = toOklab(clampedLinear)
+def getColorError(lab: Vec) -> float:
+    linear = convertColorSpace(lab, 'Oklab', 'LinearRGB')
+    clampedLinear = [clamp(x, 0, 1) for x in linear]
+    clampedLab = convertColorSpace(clampedLinear, 'LinearRGB', 'Oklab')
     return dist(lab, clampedLab)
 
-def interpolateOklch(lch1: Float3, lch2: Float3, t: float, k: float) -> Float3:
+def interp(a: float, b: float, t: float) -> float:
+    return a*(1-t) + b*t
+
+def interpolateOklch(lch1: Vec, lch2: Vec, t: float, k: float) -> Vec:
     # t: [0, 1], k: [-1, 1]
     l1, c1, h1 = lch1
     l2, c2, h2 = lch2
