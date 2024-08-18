@@ -60,6 +60,12 @@ vec3 rgb_to_srgb(vec3 linear_rgb) {
         12.92 * linear_rgb,
         step(linear_rgb, vec3(0.0031308)));
 }
+vec3 xyz_to_srgb(vec3 xyz) {
+    vec3 rgb = xyz_to_rgb(xyz);
+    vec3 clamped_rgb = clamp(rgb, 0.0, 1.0);
+    vec3 srgb = rgb_to_srgb(clamped_rgb);
+    return srgb;
+}
 
 vec3 oklab_to_srgb(vec3 lab) {
     vec3 rgb = oklab_to_rgb(lab);
