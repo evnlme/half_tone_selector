@@ -3,6 +3,7 @@ from ctypes import c_uint
 from PyQt5.QtCore import Qt, QTimer # type: ignore
 from PyQt5.QtGui import ( # type: ignore
     QOpenGLFramebufferObject,
+    QOpenGLVertexArrayObject,
     QColor,
 )
 from PyQt5.QtWidgets import ( # type: ignore
@@ -69,6 +70,10 @@ class ChromaHueSelector(QOpenGLWidget):
         self._prog_2 = createProgram(vert1, frag2)
         self._init_fbo()
 
+        self._vao = QOpenGLVertexArrayObject()
+        self._vao.create()
+        self._vao.bind()
+
         self._timer = QTimer(self)
         self._timer.timeout.connect(self.update)
         self._timer.start(int(1000.0 / 60.0)) # 60 FPS
@@ -93,6 +98,7 @@ class ChromaHueSelector(QOpenGLWidget):
             self._prog_1.setUniformValue('u_lightness', self._color2[0])
 
         self._fbo.bind()
+        self._vao.bind()
         self.glClearColor(0.0, 0.0, 0.0, 0.0)
         self.glClear(self.COLOR_BUFFER_BIT | self.DEPTH_BUFFER_BIT)
         self.glDrawArrays(self.GL_TRIANGLE_STRIP, 0, 4)
@@ -117,6 +123,7 @@ class ChromaHueSelector(QOpenGLWidget):
         self.glBindTexture(self.TEXTURE_2D, textures[1])
 
         QOpenGLFramebufferObject.bindDefault()
+        self._vao.bind()
         self.glClearColor(0.0, 0.0, 0.0, 0.0)
         self.glClear(self.COLOR_BUFFER_BIT | self.DEPTH_BUFFER_BIT)
         self.glDrawArrays(self.GL_TRIANGLE_STRIP, 0, 4)
@@ -204,6 +211,10 @@ class LightnessSelector(QOpenGLWidget):
         frag = loadShader(self.context(), shadersDir / 'lab3.frag')
         self._prog = createProgram(vert, frag)
 
+        self._vao = QOpenGLVertexArrayObject()
+        self._vao.create()
+        self._vao.bind()
+
         self._timer = QTimer(self)
         self._timer.timeout.connect(self.update)
         self._timer.start(int(1000.0 / 60.0)) # 60 FPS
@@ -218,6 +229,7 @@ class LightnessSelector(QOpenGLWidget):
             self._prog.setUniformValue('lab_1', *self._color2)
             self._prog.setUniformValue('lab_2', *self._color1)
 
+        self._vao.bind()
         self.glClearColor(0.0, 0.0, 0.0, 0.0)
         self.glClear(self.COLOR_BUFFER_BIT | self.DEPTH_BUFFER_BIT)
         self.glDrawArrays(self.GL_TRIANGLE_STRIP, 0, 4)
