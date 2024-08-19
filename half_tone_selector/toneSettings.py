@@ -34,6 +34,7 @@ class ChromaHueSelector(QOpenGLWidget):
         self._app = app
         self._width = 800
         self._height = 600
+        self._dpr = self.devicePixelRatioF()
         self._isMousePressed = False
         self._activeColor = 1
         self._changeCallback = lambda: True
@@ -133,9 +134,12 @@ class ChromaHueSelector(QOpenGLWidget):
         self._draw_2()
 
     def resizeGL(self, width, height):
-        self._width = width
-        self._height = height
-        self.glViewport(0, 0, width, height)
+        self._dpr = self.devicePixelRatioF()
+        w = round(width * self._dpr)
+        h = round(height * self._dpr)
+        self._width = w
+        self._height = h
+        self.glViewport(0, 0, w, h)
         self._init_fbo()
 
     def handleColorChange(self, coord):
@@ -154,7 +158,7 @@ class ChromaHueSelector(QOpenGLWidget):
         """Coord from pixel xy."""
         w2, h2 = self._width / 2, self._height / 2
         s = min(w2, h2)
-        coord = (0.4*(x-w2)/s, 0.4*(h2-y)/s)
+        coord = (0.4*(x*self._dpr-w2)/s, 0.4*(h2-y*self._dpr)/s)
         length = math.hypot(*coord)
         if length > 0.333:
             coord = (coord[0] / length * 0.333, coord[1] / length * 0.333)
@@ -188,6 +192,7 @@ class LightnessSelector(QOpenGLWidget):
         self._app = app
         self._width = 800
         self._height = 600
+        self._dpr = self.devicePixelRatioF()
         self._activeColor = 1
         self._isMousePressed = False
 
@@ -235,9 +240,12 @@ class LightnessSelector(QOpenGLWidget):
         self.glDrawArrays(self.GL_TRIANGLE_STRIP, 0, 4)
 
     def resizeGL(self, width, height):
-        self._width = width
-        self._height = height
-        self.glViewport(0, 0, width, height)
+        self._dpr = self.devicePixelRatioF()
+        w = round(width * self._dpr)
+        h = round(height * self._dpr)
+        self._width = w
+        self._height = h
+        self.glViewport(0, 0, w, h)
 
     def handleColorChange(self, coord):
         if self._activeColor == 1:
@@ -253,14 +261,14 @@ class LightnessSelector(QOpenGLWidget):
 
     def mouseMoveEvent(self, event):
         p = event.pos()
-        coord = p.x() / self._width
+        coord = p.x() * self._dpr / self._width
         if self._isMousePressed:
             self.handleColorChange(coord)
 
     def mousePressEvent(self, event):
         self._isMousePressed = True
         p = event.pos()
-        coord = p.x() / self._width
+        coord = p.x() * self._dpr / self._width
         d1 = abs(coord - self._color1[0])
         d2 = abs(coord - self._color2[0])
         if d1 < 0.1 or d2 < 0.1:
