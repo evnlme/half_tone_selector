@@ -1,5 +1,7 @@
 import math
+import re
 import krita as K # type: ignore
+from pathlib import Path
 from typing import Callable, Optional, List, Tuple
 from .matrix import (
     Vec,
@@ -19,6 +21,7 @@ from .ki import (
     qcolorToOklch,
     qcolorToOklchFunc,
 )
+from .palette import exportPalette
 
 def addLayout(
         qlayout: Callable[[], K.QLayout],
@@ -428,6 +431,82 @@ def previewSettings(app: HalfToneSelectorApp) -> K.QWidget:
     layout.setSpacing(5)
     return widget
 
+class ExportPaletteDialog(K.QWidget):
+    def __init__(self, halfTones: List[HalfToneSet]) -> None:
+        super().__init__()
+        self._halfTones = halfTones
+        self._isValidName = False
+        self._isPathSet = False
+        self._nameText = K.QLineEdit()
+        self._fileDialog = K.QFileDialog()
+        self._pathButton = K.QPushButton()
+        self._pathText = K.QLineEdit()
+        self._exportButton = K.QPushButton('Export')
+        self._cancelButton = K.QPushButton('Cancel')
+        self._configureLayout()
+        self._configureActions()
+
+    def _configureLayout(self) -> None:
+        mainLayout = K.QVBoxLayout()
+        mainLayout.setAlignment(K.Qt.AlignTop)
+        self.setLayout(mainLayout)
+
+        nameLayout = K.QHBoxLayout()
+        nameLayout.setContentsMargins(0, 0, 0, 0)
+        nameWidget = K.QWidget()
+        nameWidget.setLayout(nameLayout)
+        nameLayout.addWidget(K.QLabel('Name:'))
+        nameLayout.addWidget(self._nameText)
+        mainLayout.addWidget(nameWidget)
+
+        pathLayout = K.QHBoxLayout()
+        pathLayout.setContentsMargins(0, 0, 0, 0)
+        pathWidget = K.QWidget()
+        pathWidget.setLayout(pathLayout)
+        self._pathButton.setIcon(K.Krita.instance().icon('folder'))
+        self._pathText.setEnabled(False)
+        pathLayout.addWidget(self._pathButton)
+        pathLayout.addWidget(self._pathText)
+        mainLayout.addWidget(pathWidget)
+
+        exportLayout = K.QHBoxLayout()
+        exportLayout.setContentsMargins(0, 0, 0, 0)
+        exportWidget = K.QWidget()
+        exportWidget.setLayout(exportLayout)
+        exportLayout.addWidget(self._exportButton)
+        exportLayout.addWidget(self._cancelButton)
+        mainLayout.addWidget(exportWidget)
+
+    def _handleNameText(self) -> None:
+        text = self._nameText.text()
+        m = re.match(r'[\w-]+([ ]*[\w-]+)*', text)
+        self._isValidName = True if m else False
+        self._exportButton.setEnabled(self._isValidName and self._isPathSet)
+
+    def _handlePathButton(self) -> None:
+        if self._fileDialog.exec():
+            files = self._fileDialog.selectedFiles()
+            self._pathText.setText(files[0])
+            self._isPathSet = True
+            self._exportButton.setEnabled(self._isValidName and self._isPathSet)
+
+    def _handleExportButton(self) -> None:
+        name = self._nameText.text()
+        path = Path(self._pathText.text())
+        exportPalette(self._halfTones, name, path)
+        self.close()
+
+    def _handleCancelButton(self) -> None:
+        self.close()
+
+    def _configureActions(self) -> None:
+        self._nameText.textChanged.connect(self._handleNameText)
+        self._fileDialog.setFileMode(K.QFileDialog.Directory)
+        self._fileDialog.setOption(K.QFileDialog.ShowDirsOnly, True)
+        self._pathButton.clicked.connect(self._handlePathButton)
+        self._exportButton.clicked.connect(self._handleExportButton)
+        self._cancelButton.clicked.connect(self._handleCancelButton)
+
 def settingsWidget(app: HalfToneSelectorApp) -> K.QWidget:
     def create():
         hts = generateColors(app.s)
@@ -436,6 +515,13 @@ def settingsWidget(app: HalfToneSelectorApp) -> K.QWidget:
     createButton = K.QPushButton('Create half tones')
     createButton.clicked.connect(create)
 
+    def export():
+        exportButton._dialog = ExportPaletteDialog(app.s.halfTones)
+        exportButton._dialog.show()
+
+    exportButton = K.QPushButton('Export to palette')
+    exportButton.clicked.connect(export)
+
     widget, layout = addLayout(
         qlayout=K.QVBoxLayout,
         childWidgets=[
@@ -443,6 +529,7 @@ def settingsWidget(app: HalfToneSelectorApp) -> K.QWidget:
             samplingSettings(app),
             previewSettings(app),
             createButton,
+            exportButton,
         ])
     layout.setContentsMargins(0, 0, 0, 0)
     layout.setSpacing(5)
